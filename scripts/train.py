@@ -222,6 +222,8 @@ def _save_overlay(model, val_loader, cfg: dict, device: torch.device, out_path: 
             overlap=float(cfg["inference"]["overlap"]),
             mode="gaussian",
         )
+        if isinstance(logits, (list, tuple)):
+            logits = logits[0]
 
     image_np = image[0, 0].detach().cpu().numpy()
     label_np = (label[0, 0] > 0.5).detach().cpu().numpy().astype(np.uint8)
