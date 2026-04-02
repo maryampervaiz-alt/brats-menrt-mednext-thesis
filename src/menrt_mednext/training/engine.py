@@ -152,9 +152,11 @@ class Trainer:
                     overlap=self.overlap,
                     mode="gaussian",
                 )
-                loss = self.loss_fn(logits, labels)
+                loss = self._compute_supervised_loss(logits, labels)
 
             val_losses.append(float(loss.detach().cpu().item()))
+            if isinstance(logits, (list, tuple)):
+                logits = logits[0]
             processed = self.post_metric_transform({"pred": logits, "label": labels})
             pred_bin = processed["pred"]
             label_bin = processed["label"]

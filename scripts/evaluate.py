@@ -161,6 +161,8 @@ def main() -> None:
                 mode="gaussian",
             )
             loss = float(loss_fn(logits, label).detach().cpu().item())
+            if isinstance(logits, (list, tuple)):
+                logits = logits[0]
 
             processed = post({"pred": logits, "label": label})
             pred_bin = processed["pred"]
