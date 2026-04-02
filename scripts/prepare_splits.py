@@ -27,8 +27,26 @@ def parse_args() -> argparse.Namespace:
 def _resolve_data_root(cfg: dict, use_kaggle: bool) -> Path:
     if not use_kaggle:
         return Path(cfg["data"]["root_dir"])
+
     root = Path(cfg["data"]["kaggle_root_dir"])
-    for c in [root, root / "BraTS-MEN_RT", root / "BraTS-MEN-RT-Train-v2", root / "BraTS2024-MEN-RT-TrainingData"]:
+    explicit_subdir = str(cfg["data"].get("kaggle_train_subdir", "")).strip()
+    if explicit_subdir:
+        explicit_path = Path(explicit_subdir)
+        if not explicit_path.is_absolute():
+            explicit_path = root / explicit_subdir
+        if explicit_path.exists():
+            return explicit_path
+        raise FileNotFoundError(
+            f"Configured data.kaggle_train_subdir not found: {explicit_path}"
+        )
+
+    if (root / "BraTS-MEN-RT-Train-v2").exists() and (root / "BraTS-MEN-RT-Val-v1").exists():
+        raise ValueError(
+            "Both train and val folders detected under kaggle_root_dir. "
+            "Set data.kaggle_train_subdir explicitly to avoid accidental mixing."
+        )
+
+    for c in [root / "BraTS-MEN-RT-Train-v2", root / "BraTS2024-MEN-RT-TrainingData", root / "BraTS-MEN_RT", root]:
         if c.exists():
             return c
     return root

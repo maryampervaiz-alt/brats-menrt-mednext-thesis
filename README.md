@@ -108,7 +108,7 @@ python scripts/generate_thesis_tables.py --summary-csv outputs/reports/menrt_pha
 Quality-control and defense utilities:
 
 ```bash
-python scripts/check_split_leakage.py --split-json outputs/splits/kfold_5_fold0.json outputs/splits/kfold_5_fold1.json outputs/splits/kfold_5_fold2.json outputs/splits/kfold_5_fold3.json outputs/splits/kfold_5_fold4.json --fail-on-overlap
+python scripts/check_split_leakage.py --split-json outputs/splits/kfold_5_fold0.json outputs/splits/kfold_5_fold1.json outputs/splits/kfold_5_fold2.json outputs/splits/kfold_5_fold3.json outputs/splits/kfold_5_fold4.json --check-cross-fold --fail-on-overlap
 python scripts/generate_repro_report.py --config configs/default.yaml --out-json outputs/reports/repro_report.json
 python scripts/compare_experiment_stats.py --a-fold-csv outputs/reports/expA_fold_metrics.csv --b-fold-csv outputs/reports/expB_fold_metrics.csv --metric val_dice --alternative two-sided
 ```
@@ -139,6 +139,8 @@ python scripts/predict.py --config configs/default.yaml --checkpoint outputs/the
 
 Use:
 - [prepare_nnunetv2_dataset.py](scripts/prepare_nnunetv2_dataset.py)
+- [run_nnunetv2_track_b.py](scripts/run_nnunetv2_track_b.py)
+- [track_b_nnunetv2.yaml](configs/track_b_nnunetv2.yaml)
 - [NNUNETV2_PROTOCOL.md](docs/NNUNETV2_PROTOCOL.md)
 
 Example:
@@ -147,6 +149,16 @@ Example:
 python scripts/prepare_nnunetv2_dataset.py --train-root /path/to/BraTS-MEN-RT-Train-v2 --val-root /path/to/BraTS-MEN-RT-Val-v1 --nnunet-raw /path/to/nnUNet_raw --dataset-id 501 --dataset-name BraTSMENRT
 nnUNetv2_plan_and_preprocess -d 501 --verify_dataset_integrity
 ```
+
+One-command strict run:
+
+```bash
+python scripts/run_nnunetv2_track_b.py --config configs/track_b_nnunetv2.yaml --mode all
+```
+
+Notes for Track-B:
+- `trainer_name` is set to `nnUNetTrainerMedNeXt` and enforced by default.
+- `prepare_nnunetv2_dataset.py` is run with output cleanup to avoid stale files.
 
 ## Outputs (Per Run)
 

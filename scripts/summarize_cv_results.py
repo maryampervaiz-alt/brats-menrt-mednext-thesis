@@ -16,7 +16,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def _format_mean_std(series: pd.Series, precision: int = 4) -> str:
-    return f"{series.mean():.{precision}f} ± {series.std(ddof=1):.{precision}f}"
+    return f"{series.mean():.{precision}f} +/- {series.std(ddof=1):.{precision}f}"
 
 
 def main() -> None:
@@ -43,6 +43,7 @@ def main() -> None:
                 "fold": fold,
                 "best_epoch": int(best["epoch"]),
                 "val_dice": float(best["val_dice"]),
+                "val_iou": float(best["val_iou"]) if "val_iou" in df.columns else float("nan"),
                 "val_hd95": float(best["val_hd95"]),
                 "val_loss": float(best["val_loss"]),
                 "train_loss": float(best["train_loss"]),
@@ -61,9 +62,12 @@ def main() -> None:
         "val_dice_std": fold_df["val_dice"].std(ddof=1),
         "val_hd95_mean": fold_df["val_hd95"].mean(),
         "val_hd95_std": fold_df["val_hd95"].std(ddof=1),
+        "val_iou_mean": fold_df["val_iou"].mean(),
+        "val_iou_std": fold_df["val_iou"].std(ddof=1),
         "val_loss_mean": fold_df["val_loss"].mean(),
         "val_loss_std": fold_df["val_loss"].std(ddof=1),
         "dice_mean_pm_std": _format_mean_std(fold_df["val_dice"]),
+        "iou_mean_pm_std": _format_mean_std(fold_df["val_iou"]),
         "hd95_mean_pm_std": _format_mean_std(fold_df["val_hd95"]),
     }
     summary_df = pd.DataFrame([summary])
@@ -76,4 +80,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 

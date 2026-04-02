@@ -96,6 +96,7 @@ def main() -> None:
         ]
         for fold in range(args.n_folds):
             leakage_cmd.append(str(Path("outputs") / "splits" / f"kfold_{args.n_folds}_fold{fold}.json"))
+        leakage_cmd.append("--check-cross-fold")
         leakage_cmd.append("--fail-on-overlap")
         _run(leakage_cmd)
 

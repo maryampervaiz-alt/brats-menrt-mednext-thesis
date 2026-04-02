@@ -2,6 +2,15 @@
 
 This protocol is for the case where your supervisor explicitly asks for nnUNetv2 pipeline usage.
 
+## Official Thesis Wording (Track-B)
+
+Use this exact framing in thesis:
+
+1. Architecture: **MedNeXt (official package dependency)**
+2. Training framework: **nnUNetv2-style protocol with explicit MedNeXt trainer override**
+3. Data pipeline: nnUNetv2 planning and preprocessing
+4. Validation strategy: 5-fold cross-validation on labeled training data
+
 ## 1) Prepare nnUNet dataset format
 
 Use the conversion script:
@@ -13,7 +22,8 @@ python scripts/prepare_nnunetv2_dataset.py \
   --nnunet-raw /path/to/nnUNet_raw \
   --dataset-id 501 \
   --dataset-name BraTSMENRT \
-  --copy-mode copy
+  --copy-mode copy \
+  --clean-output
 ```
 
 This creates:
@@ -55,11 +65,13 @@ nnUNetv2_train 501 3d_fullres 3
 nnUNetv2_train 501 3d_fullres 4
 ```
 
-If MedNeXt-specific nnUNet trainer classes are installed:
+Track-B should be run with MedNeXt trainer override:
 
 ```bash
 nnUNetv2_train 501 3d_fullres 0 -tr nnUNetTrainerMedNeXt
 ```
+
+If your environment does not provide this trainer class, install the matching MedNeXt/nnUNet package first.
 
 ## 5) Find best configuration
 
@@ -67,9 +79,27 @@ nnUNetv2_train 501 3d_fullres 0 -tr nnUNetTrainerMedNeXt
 nnUNetv2_find_best_configuration 501 -c 3d_fullres
 ```
 
+## One-command Track-B Runner
+
+This repository includes:
+
+1. Config: `configs/track_b_nnunetv2.yaml`
+2. Runner: `scripts/run_nnunetv2_track_b.py`
+
+Dry-run to inspect all commands:
+
+```bash
+python scripts/run_nnunetv2_track_b.py --config configs/track_b_nnunetv2.yaml --mode all --dry-run
+```
+
+Execute full Track-B:
+
+```bash
+python scripts/run_nnunetv2_track_b.py --config configs/track_b_nnunetv2.yaml --mode all
+```
+
 ## Notes
 
 1. This protocol is nnUNet-native. It is separate from the custom MONAI scripts in this repo.
-2. Use this mode when supervisor explicitly asks for `nnUNetv2_plan_and_preprocess` based workflow.
+2. `configs/track_b_nnunetv2.yaml` enforces explicit `trainer_name` by default (`require_mednext_trainer: true`).
 3. Keep both protocols documented in thesis (custom MedNeXt pipeline + strict nnUNetv2 pipeline).
-

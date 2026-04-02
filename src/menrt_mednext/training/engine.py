@@ -7,6 +7,7 @@ from typing import Any
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from monai.inferers import sliding_window_inference
 from monai.transforms import Compose
 from tqdm import tqdm
@@ -54,6 +55,7 @@ class Trainer:
         self.roi_size = tuple(cfg["transforms"]["patch_size"])
         self.overlap = float(cfg["inference"].get("overlap", 0.5))
         self.early_stop_patience = int(cfg["training"].get("early_stop_patience", 1000000))
+        self.use_deep_supervision = bool(cfg.get("model", {}).get("deep_supervision", False))
 
         self.start_epoch = 1
         self.global_step = 0
@@ -76,12 +78,30 @@ class Trainer:
                         "train_loss",
                         "val_loss",
                         "val_dice",
+                        "val_iou",
                         "val_hd95",
                         "lr",
                         "epoch_seconds",
                         "max_gpu_mem_gb",
                     ]
                 )
+
+    def _compute_supervised_loss(self, logits, labels: torch.Tensor) -> torch.Tensor:
+        if isinstance(logits, (list, tuple)):
+            if not self.use_deep_supervision:
+                return self.loss_fn(logits[0], labels)
+            total = 0.0
+            weight_sum = 0.0
+            for i, out in enumerate(logits):
+                w = 1.0 / (2**i)
+                if tuple(out.shape[2:]) != tuple(labels.shape[2:]):
+                    target = F.interpolate(labels, size=out.shape[2:], mode="nearest")
+                else:
+                    target = labels
+                total = total + w * self.loss_fn(out, target)
+                weight_sum += w
+            return total / max(weight_sum, 1e-8)
+        return self.loss_fn(logits, labels)
 
     def _train_one_epoch(self, epoch: int) -> float:
         self.model.train()
@@ -96,9 +116,7 @@ class Trainer:
             self.optimizer.zero_grad(set_to_none=True)
             with self._autocast():
                 logits = self.model(images)
-                if isinstance(logits, (list, tuple)):
-                    logits = logits[0]
-                loss = self.loss_fn(logits, labels)
+                loss = self._compute_supervised_loss(logits, labels)
 
             self.scaler.scale(loss).backward()
             self.scaler.step(self.optimizer)
@@ -149,13 +167,17 @@ class Trainer:
                 pred_bin = torch.from_numpy(pred_np).to(label_bin.device).float()
 
             self.metrics["dice"](y_pred=pred_bin, y=label_bin)
+            if "iou" in self.metrics:
+                self.metrics["iou"](y_pred=pred_bin, y=label_bin)
             self.metrics["hd95"](y_pred=pred_bin, y=label_bin)
 
         dice = float(self.metrics["dice"].aggregate().item())
+        iou = float(self.metrics["iou"].aggregate().item()) if "iou" in self.metrics else float("nan")
         hd95 = float(self.metrics["hd95"].aggregate().item())
         return {
             "val_loss": float(np.mean(val_losses)) if val_losses else float("nan"),
             "val_dice": dice,
+            "val_iou": iou,
             "val_hd95": hd95,
         }
 
@@ -165,6 +187,7 @@ class Trainer:
         train_loss: float,
         val_loss: float,
         val_dice: float,
+        val_iou: float,
         val_hd95: float,
         lr: float,
         epoch_seconds: float,
@@ -172,7 +195,7 @@ class Trainer:
     ) -> None:
         with self.metrics_csv.open("a", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
-            writer.writerow([epoch, train_loss, val_loss, val_dice, val_hd95, lr, epoch_seconds, max_gpu_mem_gb])
+            writer.writerow([epoch, train_loss, val_loss, val_dice, val_iou, val_hd95, lr, epoch_seconds, max_gpu_mem_gb])
 
     def fit(self) -> None:
         ckpt_dir = self.run_dir / "checkpoints"
@@ -185,11 +208,12 @@ class Trainer:
             train_loss = self._train_one_epoch(epoch)
             lr = float(self.optimizer.param_groups[0]["lr"])
 
-            val_loss, val_dice, val_hd95 = float("nan"), float("nan"), float("nan")
+            val_loss, val_dice, val_iou, val_hd95 = float("nan"), float("nan"), float("nan"), float("nan")
             if epoch % self.val_interval == 0:
                 val_stats = self._validate(epoch)
                 val_loss = val_stats["val_loss"]
                 val_dice = val_stats["val_dice"]
+                val_iou = val_stats["val_iou"]
                 val_hd95 = val_stats["val_hd95"]
 
                 improved = val_dice > self.best_val_dice
@@ -211,11 +235,12 @@ class Trainer:
                     self.no_improve_epochs += 1
 
                 self.logger.info(
-                    "Epoch %d | train_loss=%.4f | val_loss=%.4f | val_dice=%.4f | val_hd95=%.4f | lr=%.6f",
+                    "Epoch %d | train_loss=%.4f | val_loss=%.4f | val_dice=%.4f | val_iou=%.4f | val_hd95=%.4f | lr=%.6f",
                     epoch,
                     train_loss,
                     val_loss,
                     val_dice,
+                    val_iou,
                     val_hd95,
                     lr,
                 )
@@ -261,6 +286,7 @@ class Trainer:
                 train_loss,
                 val_loss,
                 val_dice,
+                val_iou,
                 val_hd95,
                 lr,
                 epoch_seconds,

@@ -57,16 +57,41 @@ def discover_cases(
     ]
 
     image_map: dict[str, Path] = {}
+    image_collisions: dict[str, list[Path]] = {}
     for fp in image_files:
         key = _build_case_key(fp, image_keywords)
-        if key not in image_map:
-            image_map[key] = fp
+        if key in image_map:
+            image_collisions.setdefault(key, [image_map[key]]).append(fp)
+            continue
+        image_map[key] = fp
 
     label_map: dict[str, Path] = {}
+    label_collisions: dict[str, list[Path]] = {}
     for fp in label_files:
         key = _build_case_key(fp, label_keywords)
-        if key not in label_map:
-            label_map[key] = fp
+        if key in label_map:
+            label_collisions.setdefault(key, [label_map[key]]).append(fp)
+            continue
+        label_map[key] = fp
+
+    if image_collisions:
+        details = "; ".join(
+            f"{k}: {[str(p) for p in paths]}"
+            for k, paths in sorted(image_collisions.items())
+        )
+        raise RuntimeError(
+            "Duplicate image case keys detected after normalization. "
+            f"Resolve naming collisions before training. {details}"
+        )
+    if label_collisions:
+        details = "; ".join(
+            f"{k}: {[str(p) for p in paths]}"
+            for k, paths in sorted(label_collisions.items())
+        )
+        raise RuntimeError(
+            "Duplicate label case keys detected after normalization. "
+            f"Resolve naming collisions before training. {details}"
+        )
 
     records: list[CaseRecord] = []
     missing_labels = 0

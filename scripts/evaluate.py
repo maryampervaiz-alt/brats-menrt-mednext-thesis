@@ -35,7 +35,7 @@ from menrt_mednext.data.discovery import discover_cases
 from menrt_mednext.data.splits import load_split_json, make_holdout_split
 from menrt_mednext.models.mednext_factory import build_mednext
 from menrt_mednext.training.checkpoint import load_checkpoint
-from menrt_mednext.training.losses import DiceBCELoss
+from menrt_mednext.training.losses import build_loss
 from menrt_mednext.training.metrics import build_metrics
 from menrt_mednext.training.postprocess import remove_small_components_3d
 from menrt_mednext.utils.seed import set_seed
@@ -58,8 +58,26 @@ def parse_args() -> argparse.Namespace:
 def _resolve_data_root(cfg: dict, use_kaggle: bool) -> Path:
     if not use_kaggle:
         return Path(cfg["data"]["root_dir"])
+
     root = Path(cfg["data"]["kaggle_root_dir"])
-    for c in [root, root / "BraTS-MEN_RT", root / "BraTS-MEN-RT-Train-v2", root / "BraTS2024-MEN-RT-TrainingData"]:
+    explicit_subdir = str(cfg["data"].get("kaggle_train_subdir", "")).strip()
+    if explicit_subdir:
+        explicit_path = Path(explicit_subdir)
+        if not explicit_path.is_absolute():
+            explicit_path = root / explicit_subdir
+        if explicit_path.exists():
+            return explicit_path
+        raise FileNotFoundError(
+            f"Configured data.kaggle_train_subdir not found: {explicit_path}"
+        )
+
+    if (root / "BraTS-MEN-RT-Train-v2").exists() and (root / "BraTS-MEN-RT-Val-v1").exists():
+        raise ValueError(
+            "Both train and val folders detected under kaggle_root_dir. "
+            "Set data.kaggle_train_subdir explicitly to avoid accidental mixing."
+        )
+
+    for c in [root / "BraTS-MEN-RT-Train-v2", root / "BraTS2024-MEN-RT-TrainingData", root / "BraTS-MEN_RT", root]:
         if c.exists():
             return c
     return root
@@ -124,10 +142,7 @@ def main() -> None:
     load_checkpoint(args.checkpoint, model=model)
     model.eval()
 
-    loss_fn = DiceBCELoss(
-        dice_weight=float(cfg["training"]["dice_weight"]),
-        bce_weight=float(cfg["training"]["bce_weight"]),
-    )
+    loss_fn = build_loss(cfg)
     metrics = build_metrics()
     post = post_process_for_metric()
 
@@ -161,6 +176,8 @@ def main() -> None:
             for met in metrics.values():
                 met.reset()
             metrics["dice"](y_pred=pred_bin, y=label_bin)
+            if "iou" in metrics:
+                metrics["iou"](y_pred=pred_bin, y=label_bin)
             metrics["hd95"](y_pred=pred_bin, y=label_bin)
 
             rows.append(
@@ -168,6 +185,7 @@ def main() -> None:
                     "case_id": batch["case_id"][0],
                     "loss": loss,
                     "dice": float(metrics["dice"].aggregate().item()),
+                    "iou": float(metrics["iou"].aggregate().item()) if "iou" in metrics else float("nan"),
                     "hd95": float(metrics["hd95"].aggregate().item()),
                 }
             )
@@ -177,6 +195,8 @@ def main() -> None:
         "num_cases": int(len(df)),
         "dice_mean": float(df["dice"].mean()),
         "dice_std": float(df["dice"].std(ddof=1)) if len(df) > 1 else 0.0,
+        "iou_mean": float(df["iou"].mean()),
+        "iou_std": float(df["iou"].std(ddof=1)) if len(df) > 1 else 0.0,
         "hd95_mean": float(df["hd95"].mean()),
         "hd95_std": float(df["hd95"].std(ddof=1)) if len(df) > 1 else 0.0,
         "loss_mean": float(df["loss"].mean()),

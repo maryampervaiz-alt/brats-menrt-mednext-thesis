@@ -29,23 +29,25 @@ def main() -> None:
     run_prefix = row["run_prefix"]
     n_folds = int(row["n_folds"])
     dice_pm = row["dice_mean_pm_std"]
+    iou_pm = row["iou_mean_pm_std"] if "iou_mean_pm_std" in summary_df.columns else "N/A"
     hd95_pm = row["hd95_mean_pm_std"]
 
     md_lines = [
-        "| Experiment | Folds | Val Dice (mean ± std) | Val HD95 (mean ± std) |",
-        "|---|---:|---:|---:|",
-        f"| {run_prefix} | {n_folds} | {dice_pm} | {hd95_pm} |",
+        "| Experiment | Folds | Val Dice (mean +/- std) | Val IoU (mean +/- std) | Val HD95 (mean +/- std) |",
+        "|---|---:|---:|---:|---:|",
+        f"| {run_prefix} | {n_folds} | {dice_pm} | {iou_pm} | {hd95_pm} |",
         "",
         "### Fold-wise Best Metrics",
         "",
     ]
-    header = "| fold | best_epoch | val_dice | val_hd95 | val_loss | train_loss | lr |"
-    sep = "|---:|---:|---:|---:|---:|---:|---:|"
+    header = "| fold | best_epoch | val_dice | val_iou | val_hd95 | val_loss | train_loss | lr |"
+    sep = "|---:|---:|---:|---:|---:|---:|---:|---:|"
     md_lines.extend([header, sep])
     for row in fold_df.itertuples(index=False):
+        iou_value = float(row.val_iou) if hasattr(row, "val_iou") else float("nan")
         md_lines.append(
             f"| {int(row.fold)} | {int(row.best_epoch)} | {float(row.val_dice):.4f} | "
-            f"{float(row.val_hd95):.4f} | {float(row.val_loss):.4f} | {float(row.train_loss):.4f} | "
+            f"{iou_value:.4f} | {float(row.val_hd95):.4f} | {float(row.val_loss):.4f} | {float(row.train_loss):.4f} | "
             f"{float(row.lr):.6f} |"
         )
     md_lines.append("")
@@ -54,11 +56,11 @@ def main() -> None:
     tex_lines = [
         "\\begin{table}[ht]",
         "\\centering",
-        "\\begin{tabular}{lccc}",
+        "\\begin{tabular}{lcccc}",
         "\\hline",
-        "Experiment & Folds & Val Dice ($\\mu\\pm\\sigma$) & Val HD95 ($\\mu\\pm\\sigma$)\\\\",
+        "Experiment & Folds & Val Dice ($\\mu\\pm\\sigma$) & Val IoU ($\\mu\\pm\\sigma$) & Val HD95 ($\\mu\\pm\\sigma$)\\\\",
         "\\hline",
-        f"{run_prefix} & {n_folds} & {dice_pm} & {hd95_pm}\\\\",
+        f"{run_prefix} & {n_folds} & {dice_pm} & {iou_pm} & {hd95_pm}\\\\",
         "\\hline",
         "\\end{tabular}",
         "\\caption{Cross-validation performance summary for MedNeXt on MEN-RT.}",
@@ -74,3 +76,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

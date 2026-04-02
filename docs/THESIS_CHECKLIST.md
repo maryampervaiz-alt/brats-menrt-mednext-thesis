@@ -21,8 +21,18 @@
 1. Lock patch size to `128x160x112`.
 2. Run LR sweep with `0.0027` and `0.0005`.
 3. Train full 5-fold CV for each LR.
-4. Generate fold metrics CSV and mean±std summary.
+4. Generate fold metrics CSV and mean+/-std summary.
 5. Auto-generate thesis tables (Markdown + LaTeX).
+
+## Track-B (Official nnUNet-Style)
+
+1. Use official wording:
+   Architecture: MedNeXt (official package dependency)
+   Training framework: nnUNetv2-style protocol with explicit MedNeXt trainer override
+2. Prepare nnUNet dataset format (`prepare_nnunetv2_dataset.py`).
+3. Run planning/preprocessing (`nnUNetv2_plan_and_preprocess`).
+4. Train all 5 folds using `nnUNetv2_train`.
+5. Save command logs and final best-configuration summary.
 
 ## Ablation Suggestions
 
@@ -54,3 +64,4 @@
 2. Export per-case evaluation CSV and inspect worst Dice cases.
 3. Report epoch runtime and max GPU memory from `metrics/history.csv`.
 4. Use paired Wilcoxon test between candidate settings (`scripts/compare_experiment_stats.py`).
+

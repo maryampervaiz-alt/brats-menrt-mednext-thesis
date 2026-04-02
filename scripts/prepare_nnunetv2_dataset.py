@@ -16,6 +16,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--image-keyword", type=str, default="_t1c.nii.gz")
     p.add_argument("--label-keyword", type=str, default="_gtv.nii.gz")
     p.add_argument("--copy-mode", type=str, default="copy", choices=["copy", "hardlink"])
+    p.add_argument(
+        "--clean-output",
+        action="store_true",
+        help="Delete existing imagesTr/labelsTr/imagesTs for this dataset before writing new files.",
+    )
     return p.parse_args()
 
 
@@ -32,27 +37,72 @@ def _copy_or_link(src: Path, dst: Path, mode: str) -> None:
     shutil.copy2(src, dst)
 
 
+def _clear_dir(path: Path) -> None:
+    if not path.exists():
+        path.mkdir(parents=True, exist_ok=True)
+        return
+    for item in path.iterdir():
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+
+
 def _collect_labeled_cases(root: Path, image_kw: str, label_kw: str) -> list[tuple[str, Path, Path]]:
+    images = sorted(root.rglob(f"*{image_kw}"))
+    if not images:
+        return []
+
     cases = []
-    for case_dir in sorted([p for p in root.iterdir() if p.is_dir()]):
-        imgs = sorted(case_dir.glob(f"*{image_kw}"))
-        lbls = sorted(case_dir.glob(f"*{label_kw}"))
-        if not imgs or not lbls:
-            continue
+    seen_case_dirs = set()
+    case_id_to_dirs: dict[str, set[Path]] = {}
+    for img in images:
+        case_dir = img.parent
         case_id = case_dir.name
-        cases.append((case_id, imgs[0], lbls[0]))
-    return cases
+        case_id_to_dirs.setdefault(case_id, set()).add(case_dir)
+        if case_dir in seen_case_dirs:
+            continue
+        lbls = sorted(case_dir.glob(f"*{label_kw}"))
+        if not lbls:
+            continue
+        seen_case_dirs.add(case_dir)
+        cases.append((case_id, img, lbls[0]))
+
+    duplicate_ids = {k: sorted(str(x) for x in v) for k, v in case_id_to_dirs.items() if len(v) > 1}
+    if duplicate_ids:
+        raise RuntimeError(
+            "Duplicate case folder names found under train_root. "
+            "Case IDs must be unique for nnUNet conversion. "
+            f"Conflicts: {duplicate_ids}"
+        )
+    return sorted(cases, key=lambda x: x[0])
 
 
 def _collect_unlabeled_cases(root: Path, image_kw: str) -> list[tuple[str, Path]]:
+    images = sorted(root.rglob(f"*{image_kw}"))
+    if not images:
+        return []
+
     cases = []
-    for case_dir in sorted([p for p in root.iterdir() if p.is_dir()]):
-        imgs = sorted(case_dir.glob(f"*{image_kw}"))
-        if not imgs:
-            continue
+    seen_case_dirs = set()
+    case_id_to_dirs: dict[str, set[Path]] = {}
+    for img in images:
+        case_dir = img.parent
         case_id = case_dir.name
-        cases.append((case_id, imgs[0]))
-    return cases
+        case_id_to_dirs.setdefault(case_id, set()).add(case_dir)
+        if case_dir in seen_case_dirs:
+            continue
+        seen_case_dirs.add(case_dir)
+        cases.append((case_id, img))
+
+    duplicate_ids = {k: sorted(str(x) for x in v) for k, v in case_id_to_dirs.items() if len(v) > 1}
+    if duplicate_ids:
+        raise RuntimeError(
+            "Duplicate case folder names found under val_root. "
+            "Case IDs must be unique for nnUNet conversion. "
+            f"Conflicts: {duplicate_ids}"
+        )
+    return sorted(cases, key=lambda x: x[0])
 
 
 def _write_dataset_json(path: Path, num_training: int, dataset_name: str) -> None:
@@ -111,10 +161,15 @@ def main() -> None:
     images_tr.mkdir(parents=True, exist_ok=True)
     labels_tr.mkdir(parents=True, exist_ok=True)
     images_ts.mkdir(parents=True, exist_ok=True)
+    if args.clean_output:
+        _clear_dir(images_tr)
+        _clear_dir(labels_tr)
+        _clear_dir(images_ts)
 
     labeled = _collect_labeled_cases(train_root, args.image_keyword, args.label_keyword)
     if not labeled:
         raise RuntimeError("No labeled cases found. Check train root and keywords.")
+    unique_case_ids = {case_id for case_id, _, _ in labeled}
 
     for case_id, img, lbl in labeled:
         _copy_or_link(img, images_tr / f"{case_id}_0000.nii.gz", args.copy_mode)
@@ -123,6 +178,11 @@ def main() -> None:
     unlabeled_count = 0
     if val_root is not None and val_root.exists():
         unlabeled = _collect_unlabeled_cases(val_root, args.image_keyword)
+        overlap = unique_case_ids.intersection({case_id for case_id, _ in unlabeled})
+        if overlap:
+            raise RuntimeError(
+                f"Detected overlap between train and val case IDs: {sorted(list(overlap))[:10]}"
+            )
         for case_id, img in unlabeled:
             _copy_or_link(img, images_ts / f"{case_id}_0000.nii.gz", args.copy_mode)
         unlabeled_count = len(unlabeled)
