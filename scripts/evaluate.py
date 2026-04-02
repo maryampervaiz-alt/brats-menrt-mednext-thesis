@@ -180,7 +180,8 @@ def main() -> None:
             metrics["dice"](y_pred=pred_bin, y=label_bin)
             if "iou" in metrics:
                 metrics["iou"](y_pred=pred_bin, y=label_bin)
-            metrics["hd95"](y_pred=pred_bin, y=label_bin)
+            # Compute HD95 on CPU to avoid Kaggle CuPy/cuCIM NVRTC toolchain failures.
+            metrics["hd95"](y_pred=pred_bin.detach().cpu(), y=label_bin.detach().cpu())
 
             rows.append(
                 {

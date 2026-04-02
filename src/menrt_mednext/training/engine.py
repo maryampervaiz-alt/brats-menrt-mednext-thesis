@@ -171,7 +171,8 @@ class Trainer:
             self.metrics["dice"](y_pred=pred_bin, y=label_bin)
             if "iou" in self.metrics:
                 self.metrics["iou"](y_pred=pred_bin, y=label_bin)
-            self.metrics["hd95"](y_pred=pred_bin, y=label_bin)
+            # Compute HD95 on CPU to avoid Kaggle CuPy/cuCIM NVRTC toolchain failures.
+            self.metrics["hd95"](y_pred=pred_bin.detach().cpu(), y=label_bin.detach().cpu())
 
         dice = float(self.metrics["dice"].aggregate().item())
         iou = float(self.metrics["iou"].aggregate().item()) if "iou" in self.metrics else float("nan")
