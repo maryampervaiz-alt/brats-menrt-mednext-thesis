@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import argparse
+import os
 import subprocess
 import sys
+import warnings
 from pathlib import Path
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+os.environ.setdefault("ABSL_LOGGING_MIN_LEVEL", "3")
+warnings.filterwarnings("ignore", message=".*cuda.cudart module is deprecated.*", category=FutureWarning)
 
 
 def parse_args() -> argparse.Namespace:

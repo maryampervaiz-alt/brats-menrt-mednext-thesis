@@ -9,7 +9,6 @@ import numpy as np
 import torch
 from monai.inferers import sliding_window_inference
 from monai.transforms import Compose
-from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
 from menrt_mednext.training.checkpoint import save_checkpoint
@@ -47,7 +46,7 @@ class Trainer:
         self.cfg = cfg
         self.logger = logger
         self.amp = amp and torch.cuda.is_available()
-        self.scaler = GradScaler(enabled=self.amp)
+        self.scaler = self._make_grad_scaler(self.amp)
 
         self.epochs = int(cfg["training"]["epochs"])
         self.val_interval = int(cfg["training"].get("val_interval", 1))
@@ -95,7 +94,7 @@ class Trainer:
             labels = batch["label"].to(self.device).float()
 
             self.optimizer.zero_grad(set_to_none=True)
-            with autocast(enabled=self.amp):
+            with self._autocast():
                 logits = self.model(images)
                 if isinstance(logits, (list, tuple)):
                     logits = logits[0]
@@ -126,7 +125,7 @@ class Trainer:
             images = batch["image"].to(self.device)
             labels = batch["label"].to(self.device).float()
 
-            with autocast(enabled=self.amp):
+            with self._autocast():
                 logits = sliding_window_inference(
                     inputs=images,
                     roi_size=self.roi_size,
@@ -281,3 +280,21 @@ class Trainer:
                     self.early_stop_patience,
                 )
                 break
+
+    @staticmethod
+    def _make_grad_scaler(enabled: bool):
+        # Prefer new torch.amp API; fallback for older torch versions.
+        try:
+            return torch.amp.GradScaler(device="cuda", enabled=enabled)
+        except Exception:
+            from torch.cuda.amp import GradScaler
+
+            return GradScaler(enabled=enabled)
+
+    def _autocast(self):
+        try:
+            return torch.amp.autocast(device_type="cuda", enabled=self.amp)
+        except Exception:
+            from torch.cuda.amp import autocast
+
+            return autocast(enabled=self.amp)

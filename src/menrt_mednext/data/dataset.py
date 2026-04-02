@@ -36,7 +36,7 @@ def build_train_transforms(cfg: dict[str, Any]) -> Compose:
         [
             LoadImaged(keys=["image", "label"]),
             EnsureChannelFirstd(keys=["image", "label"]),
-            Orientationd(keys=["image", "label"], axcodes="RAS"),
+            Orientationd(keys=["image", "label"], axcodes="RAS", labels=None),
             Spacingd(
                 keys=["image", "label"],
                 pixdim=spacing,
@@ -80,7 +80,7 @@ def build_val_transforms(cfg: dict[str, Any]) -> Compose:
         [
             LoadImaged(keys=["image", "label"]),
             EnsureChannelFirstd(keys=["image", "label"]),
-            Orientationd(keys=["image", "label"], axcodes="RAS"),
+            Orientationd(keys=["image", "label"], axcodes="RAS", labels=None),
             Spacingd(
                 keys=["image", "label"],
                 pixdim=spacing,
@@ -101,7 +101,7 @@ def build_infer_transforms(cfg: dict[str, Any]) -> Compose:
         [
             LoadImaged(keys=["image"]),
             EnsureChannelFirstd(keys=["image"]),
-            Orientationd(keys=["image"], axcodes="RAS"),
+            Orientationd(keys=["image"], axcodes="RAS", labels=None),
             Spacingd(keys=["image"], pixdim=spacing, mode=("bilinear",)),
             NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
             ResizeWithPadOrCropd(keys=["image"], spatial_size=patch_size),

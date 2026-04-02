@@ -2,8 +2,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
+import warnings
 from pathlib import Path
+
+os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "3")
+os.environ.setdefault("ABSL_LOGGING_MIN_LEVEL", "3")
+
+warnings.filterwarnings("ignore", message=".*cuda.cudart module is deprecated.*", category=FutureWarning)
+warnings.filterwarnings("ignore", message=".*Orientationd.__init__:labels.*", category=FutureWarning)
+warnings.filterwarnings(
+    "ignore",
+    message=".*Using a non-tuple sequence for multidimensional indexing is deprecated.*",
+    category=UserWarning,
+)
+warnings.filterwarnings("ignore", message=".*get_mask_edges:always_return_as_numpy.*", category=FutureWarning)
 
 import pandas as pd
 import torch
