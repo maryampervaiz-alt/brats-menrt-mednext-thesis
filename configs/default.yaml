@@ -1,0 +1,73 @@
+DEBUG: false
+run_name: "mednext_base_menrt"
+seed: 2026
+deterministic: true
+
+data:
+  root_dir: "./BraTS2024-MEN-RT-TrainingData"
+  kaggle_root_dir: "/kaggle/input/brats-men-rt"
+  kaggle_auto_path: true
+  image_keywords: ["t1c"]
+  label_keywords: ["gtv", "seg"]
+  val_fraction: 0.2
+  split_json: ""
+  cache_rate: 0.1
+  val_cache_rate: 0.1
+
+model:
+  in_channels: 1
+  num_classes: 1
+  model_id: "B"
+  kernel_size: 3
+  deep_supervision: false
+  checkpoint_style: null
+
+transforms:
+  spacing: [1.0, 1.0, 1.0]
+  patch_size: [128, 160, 112]
+
+training:
+  epochs: 150
+  batch_size: 1
+  val_batch_size: 1
+  optimizer_name: "schedulefree_adamw"   # adamw | schedulefree_adamw
+  lr: 0.0027
+  weight_decay: 0.0
+  amp: true
+  val_interval: 1
+  save_every: 10
+  early_stop_patience: 70
+  scheduler_name: "cosine"
+  dice_weight: 0.7
+  bce_weight: 0.3
+  auto_resume: true
+  resume_path: ""
+
+cv:
+  enabled: false
+  n_folds: 5
+  fold_index: 0
+
+sweep:
+  lr_values: [0.0027, 0.0005]
+
+postprocess:
+  enabled: true
+  min_size_voxels: 20
+
+inference:
+  sw_batch_size: 1
+  overlap: 0.5
+
+debug:
+  max_train_cases: 12
+  max_val_cases: 4
+  epochs: 3
+  num_workers: 0
+
+system:
+  num_workers: 2
+  pin_memory: true
+
+output:
+  root_dir: "./outputs"
