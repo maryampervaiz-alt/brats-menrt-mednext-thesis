@@ -4,6 +4,7 @@ import argparse
 import importlib
 import inspect
 import json
+import os
 import pkgutil
 import shutil
 from pathlib import Path
@@ -24,11 +25,27 @@ def _load_cfg(path: str) -> dict:
     return cfg["mednext_nnunet"]
 
 
-def _find_case_dirs(root: Path, image_keyword: str, label_keyword: str | None) -> tuple[list[Path], dict[str, list[str]], list[str]]:
-    image_files = sorted(root.rglob(f"*{image_keyword}"))
+def _set_nnunet_env_from_cfg(cfg: dict) -> None:
+    os.environ["nnUNet_raw_data_base"] = str(cfg["nnunet_raw_data_base"])
+    os.environ["nnUNet_preprocessed"] = str(cfg["nnunet_preprocessed"])
+    os.environ["RESULTS_FOLDER"] = str(cfg["results_folder"])
+
+
+def _find_files_case_insensitive(root: Path, suffix: str) -> list[Path]:
+    suffix_lower = suffix.lower()
+    return sorted([p for p in root.rglob("*") if p.is_file() and p.name.lower().endswith(suffix_lower)])
+
+
+def _find_case_dirs(
+    root: Path,
+    image_keyword: str,
+    label_keyword: str | None,
+) -> tuple[list[Path], dict[str, list[str]], list[str], int, list[str]]:
+    image_files = _find_files_case_insensitive(root, image_keyword)
     case_dirs = []
     duplicate_case_ids: dict[str, list[str]] = {}
     missing_labels: list[str] = []
+    sample_images = [str(p) for p in image_files[:5]]
     case_id_to_dirs: dict[str, set[Path]] = {}
 
     seen_case_dirs: set[Path] = set()
@@ -40,7 +57,7 @@ def _find_case_dirs(root: Path, image_keyword: str, label_keyword: str | None) -
             continue
         seen_case_dirs.add(case_dir)
         if label_keyword is not None:
-            labels = sorted(case_dir.glob(f"*{label_keyword}"))
+            labels = sorted([p for p in case_dir.iterdir() if p.is_file() and p.name.lower().endswith(label_keyword.lower())])
             if len(labels) == 0:
                 missing_labels.append(case_id)
                 continue
@@ -54,7 +71,7 @@ def _find_case_dirs(root: Path, image_keyword: str, label_keyword: str | None) -
         if len(dirs) > 1:
             duplicate_case_ids[case_id] = sorted(str(d) for d in dirs)
 
-    return sorted(case_dirs), duplicate_case_ids, sorted(missing_labels)
+    return sorted(case_dirs), duplicate_case_ids, sorted(missing_labels), len(image_files), sample_images
 
 
 def _locate_trainer(base_trainer: str) -> dict:
@@ -88,6 +105,7 @@ def _locate_trainer(base_trainer: str) -> dict:
 def main() -> None:
     args = parse_args()
     cfg = _load_cfg(args.config)
+    _set_nnunet_env_from_cfg(cfg)
 
     train_root = Path(cfg["train_root"])
     val_root = Path(cfg["val_root"]) if str(cfg.get("val_root", "")).strip() else None
@@ -105,32 +123,40 @@ def main() -> None:
     }
 
     if train_root.exists():
-        train_cases, train_duplicates, missing_labels = _find_case_dirs(
+        train_cases, train_duplicates, missing_labels, train_image_count, train_sample_images = _find_case_dirs(
             train_root,
             image_keyword=str(cfg["image_keyword"]),
             label_keyword=str(cfg["label_keyword"]),
         )
         report["train_case_count"] = len(train_cases)
+        report["train_image_match_count"] = train_image_count
+        report["train_sample_images"] = train_sample_images
         report["train_duplicate_case_ids"] = train_duplicates
         report["train_missing_labels"] = missing_labels
     else:
         report["train_case_count"] = 0
+        report["train_image_match_count"] = 0
+        report["train_sample_images"] = []
         report["train_duplicate_case_ids"] = {}
         report["train_missing_labels"] = []
 
     if val_root is not None and val_root.exists():
-        val_cases, val_duplicates, _ = _find_case_dirs(
+        val_cases, val_duplicates, _, val_image_count, val_sample_images = _find_case_dirs(
             val_root,
             image_keyword=str(cfg["image_keyword"]),
             label_keyword=None,
         )
         report["val_case_count"] = len(val_cases)
+        report["val_image_match_count"] = val_image_count
+        report["val_sample_images"] = val_sample_images
         report["val_duplicate_case_ids"] = val_duplicates
         train_case_ids = {p.name for p in train_cases} if train_root.exists() else set()
         val_case_ids = {p.name for p in val_cases}
         report["train_val_overlap_case_ids"] = sorted(train_case_ids.intersection(val_case_ids))
     else:
         report["val_case_count"] = 0
+        report["val_image_match_count"] = 0
+        report["val_sample_images"] = []
         report["val_duplicate_case_ids"] = {}
         report["train_val_overlap_case_ids"] = []
 

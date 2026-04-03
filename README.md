@@ -25,6 +25,11 @@ That means:
 pip install -r requirements.txt
 ```
 
+This installs:
+
+- official MedNeXt package
+- explicit `nnunet==1.7.1` so `nnUNet_predict` is available consistently
+
 ## Main Config
 
 Use:
@@ -124,6 +129,7 @@ python scripts/validate_mednext_nnunet_setup.py --config configs/mednext_nnunet.
 This checks:
 
 - required CLI commands are available
+- official nnU-Net environment variables are set from config during validation
 - train/val roots exist
 - train cases and val cases can be discovered
 - duplicate case IDs are detected early

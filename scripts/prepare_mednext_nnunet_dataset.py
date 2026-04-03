@@ -46,8 +46,13 @@ def _clear_dir(path: Path) -> None:
             item.unlink()
 
 
+def _find_files_case_insensitive(root: Path, suffix: str) -> list[Path]:
+    suffix_lower = suffix.lower()
+    return sorted([p for p in root.rglob("*") if p.is_file() and p.name.lower().endswith(suffix_lower)])
+
+
 def _collect_labeled_cases(root: Path, image_kw: str, label_kw: str) -> list[tuple[str, Path, Path]]:
-    images = sorted(root.rglob(f"*{image_kw}"))
+    images = _find_files_case_insensitive(root, image_kw)
     if not images:
         return []
 
@@ -60,7 +65,7 @@ def _collect_labeled_cases(root: Path, image_kw: str, label_kw: str) -> list[tup
         case_id_to_dirs.setdefault(case_id, set()).add(case_dir)
         if case_dir in seen_case_dirs:
             continue
-        labels = sorted(case_dir.glob(f"*{label_kw}"))
+        labels = sorted([p for p in case_dir.iterdir() if p.is_file() and p.name.lower().endswith(label_kw.lower())])
         if not labels:
             continue
         if len(labels) != 1:
@@ -81,7 +86,7 @@ def _collect_labeled_cases(root: Path, image_kw: str, label_kw: str) -> list[tup
 
 
 def _collect_unlabeled_cases(root: Path, image_kw: str) -> list[tuple[str, Path]]:
-    images = sorted(root.rglob(f"*{image_kw}"))
+    images = _find_files_case_insensitive(root, image_kw)
     if not images:
         return []
 

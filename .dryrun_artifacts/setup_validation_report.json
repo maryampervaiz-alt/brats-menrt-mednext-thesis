@@ -1,0 +1,21 @@
+{
+  "config_path": "C:\\Users\\10\\OneDrive\\Desktop\\BraTs MEN-RT\\configs\\mednext_nnunet.yaml",
+  "task_name": "Task502_BraTSMENRT",
+  "train_root_exists": false,
+  "val_root_exists": false,
+  "required_commands": {
+    "mednextv1_plan_and_preprocess": false,
+    "mednextv1_train": false,
+    "nnUNet_predict": false
+  },
+  "train_case_count": 0,
+  "train_image_match_count": 0,
+  "train_sample_images": [],
+  "train_duplicate_case_ids": {},
+  "train_missing_labels": [],
+  "val_case_count": 0,
+  "val_image_match_count": 0,
+  "val_sample_images": [],
+  "val_duplicate_case_ids": {},
+  "train_val_overlap_case_ids": []
+}
