@@ -7,6 +7,7 @@
 3. Run training with full data.
 4. Report best epoch by validation Dice.
 5. Keep both `best_model.pt` and `latest_checkpoint.pt` archived.
+6. State clearly that the baseline path uses the official MedNeXt architecture within a custom MONAI training pipeline.
 
 ## Cross-Validation (Phase-1)
 
@@ -15,6 +16,7 @@
 3. Save each fold best checkpoint (`outputs/<run_prefix>_foldX/checkpoints/best_model.pt`).
 4. Build ensemble predictions with `scripts/infer_ensemble_cv.py`.
 5. Report mean and std across folds for Dice and HD95.
+6. Confirm grouped splitting assumptions from `data.group_pattern` match the dataset naming scheme.
 
 ## Phase-2 Protocol (Paper-Inspired)
 
@@ -44,9 +46,10 @@
 ## Metrics to Report
 
 1. Dice (mean across val cases)
-2. HD95 (mean across val cases)
-3. Training time per epoch
-4. GPU memory footprint
+2. IoU (mean across val cases)
+3. HD95 (mean across val cases)
+4. Training time per epoch
+5. GPU memory footprint
 
 ## Reproducibility Artifacts
 
@@ -57,6 +60,7 @@
 5. checkpoints (`best_model.pt`, `latest_checkpoint.pt`, `epoch_*.pt`)
 6. overlay figures (`figures/qualitative_overlay.png`)
 7. `outputs/reports/*_repro_report.json`
+8. original-space inference outputs when exporting predictions
 
 ## Defense-Risk Mitigation
 

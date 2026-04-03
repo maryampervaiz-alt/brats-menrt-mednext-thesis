@@ -69,6 +69,7 @@ def main() -> None:
         records,
         val_fraction=float(cfg["data"]["val_fraction"]),
         seed=int(cfg["seed"]),
+        group_pattern=str(cfg["data"].get("group_pattern", "")).strip(),
     )
 
     split_path = out_dir / "holdout_split.json"

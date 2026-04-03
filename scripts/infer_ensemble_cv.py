@@ -8,7 +8,7 @@ import numpy as np
 import torch
 from monai.data import decollate_batch
 from monai.inferers import sliding_window_inference
-from monai.transforms import Compose, EnsureTyped, SaveImaged
+from monai.transforms import Compose, EnsureTyped, Invertd, SaveImaged
 from tqdm import tqdm
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -87,9 +87,10 @@ def main() -> None:
     )
     infer_items = [{"case_id": r.case_id, "image": r.image} for r in records]
 
+    infer_transforms = build_infer_transforms(cfg)
     infer_ds = make_dataset(
         infer_items,
-        build_infer_transforms(cfg),
+        infer_transforms,
         cache_rate=0.0,
         num_workers=int(cfg["system"]["num_workers"]),
     )
@@ -103,10 +104,19 @@ def main() -> None:
 
     save_tf = Compose(
         [
+            Invertd(
+                keys="pred",
+                transform=infer_transforms,
+                orig_keys="image",
+                meta_keys="pred_meta_dict",
+                orig_meta_keys="image_meta_dict",
+                nearest_interp=True,
+                to_tensor=True,
+            ),
             EnsureTyped(keys="pred"),
             SaveImaged(
                 keys="pred",
-                meta_keys="image_meta_dict",
+                meta_keys="pred_meta_dict",
                 output_dir=str(out_dir),
                 output_postfix="gtv_pred_ens",
                 separate_folder=False,
@@ -136,6 +146,8 @@ def main() -> None:
                 overlap=overlap,
                 mode="gaussian",
             )
+            if isinstance(logits, (list, tuple)):
+                logits = logits[0]
             probs = torch.sigmoid(logits)
             probs_acc = probs if probs_acc is None else probs_acc + probs
 
@@ -155,4 +167,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

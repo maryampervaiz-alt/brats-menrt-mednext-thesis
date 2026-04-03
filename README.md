@@ -8,6 +8,8 @@ Research-grade training pipeline for BraTS 2024 MEN-RT:
 Important:
 - This is **not** a scratch reimplementation of MedNeXt internals.
 - It uses the official MedNeXt repository as a dependency and trains it on MEN-RT data.
+- The default `train.py` / `train_cv.py` path is a custom MONAI training pipeline around the official MedNeXt architecture.
+- The strict nnUNet-style workflow is provided separately as Track-B.
 
 ## What is Fixed
 
@@ -32,10 +34,12 @@ Set local training root in `configs/default.yaml`:
 For Kaggle:
 - Use `--kaggle` flag
 - Configure `data.kaggle_root_dir`
+- Configure `data.kaggle_train_subdir` explicitly to the labeled training folder
 
 The code discovers files recursively by keywords:
 - Image keywords: `t1c`
 - Label keywords: `gtv`, `seg`
+- Grouped splitting is supported via `data.group_pattern` to reduce patient/session leakage risk.
 
 ## 1) Prepare Split
 
@@ -67,6 +71,9 @@ python scripts/train.py --config configs/default.yaml --run-name thesis_mednext_
 ```bash
 python scripts/train.py --config configs/default.yaml --kaggle --run-name kaggle_mednext_base
 ```
+
+Note:
+- The Kaggle training path should point to the labeled training subset only, for example `BraTS2024-MEN-RT-TrainingData`.
 
 ## 5) 5-Fold Cross-Validation (Phase-1)
 
@@ -134,6 +141,10 @@ python scripts/evaluate.py --config configs/default.yaml --checkpoint outputs/th
 ```bash
 python scripts/predict.py --config configs/default.yaml --checkpoint outputs/thesis_mednext_base/checkpoints/best_model.pt --data-root /path/to/images --out-dir outputs/inference
 ```
+
+Inference notes:
+- Default prediction export is inverted back to original image space before saving.
+- Postprocessing is disabled by default in config; enable it explicitly only when you intend to report postprocessed metrics.
 
 ## 10) Strict nnUNetv2 Pipeline (If Supervisor Demands)
 

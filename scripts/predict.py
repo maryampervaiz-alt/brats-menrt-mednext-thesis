@@ -7,7 +7,7 @@ from pathlib import Path
 import torch
 from monai.data import decollate_batch
 from monai.inferers import sliding_window_inference
-from monai.transforms import Activationsd, AsDiscreted, Compose, EnsureTyped, SaveImaged
+from monai.transforms import Activationsd, AsDiscreted, Compose, EnsureTyped, Invertd, SaveImaged
 from tqdm import tqdm
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -52,9 +52,10 @@ def main():
     )
     infer_items = [{"case_id": r.case_id, "image": r.image} for r in records]
 
+    infer_transforms = build_infer_transforms(cfg)
     infer_ds = make_dataset(
         infer_items,
-        build_infer_transforms(cfg),
+        infer_transforms,
         cache_rate=0.0,
         num_workers=int(cfg["system"]["num_workers"]),
     )
@@ -81,10 +82,19 @@ def main():
         [
             Activationsd(keys="pred", sigmoid=True),
             AsDiscreted(keys="pred", threshold=0.5),
+            Invertd(
+                keys="pred",
+                transform=infer_transforms,
+                orig_keys="image",
+                meta_keys="pred_meta_dict",
+                orig_meta_keys="image_meta_dict",
+                nearest_interp=True,
+                to_tensor=True,
+            ),
             EnsureTyped(keys="pred"),
             SaveImaged(
                 keys="pred",
-                meta_keys="image_meta_dict",
+                meta_keys="pred_meta_dict",
                 output_dir=str(out_dir),
                 output_postfix="gtv_pred",
                 separate_folder=False,
@@ -109,6 +119,8 @@ def main():
             overlap=overlap,
             mode="gaussian",
         )
+        if isinstance(logits, (list, tuple)):
+            logits = logits[0]
         batch["pred"] = logits
         _ = [post(i) for i in decollate_batch(batch)]
 

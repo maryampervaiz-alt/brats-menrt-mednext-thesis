@@ -134,6 +134,7 @@ def _build_or_load_split(
         return train_records, val_records
 
     cv_cfg = cfg.get("cv", {})
+    group_pattern = str(cfg["data"].get("group_pattern", "")).strip()
     use_kfold = use_kfold or bool(cv_cfg.get("enabled", False))
     if use_kfold:
         n_folds = int(n_folds_override if n_folds_override > 1 else cv_cfg.get("n_folds", 5))
@@ -143,12 +144,14 @@ def _build_or_load_split(
             n_splits=n_folds,
             fold_index=fold_index,
             seed=int(cfg["seed"]),
+            group_pattern=group_pattern,
         )
     else:
         train_records, val_records = make_holdout_split(
             records=all_records,
             val_fraction=float(cfg["data"]["val_fraction"]),
             seed=int(cfg["seed"]),
+            group_pattern=group_pattern,
         )
 
     if save_path is not None:
@@ -193,6 +196,18 @@ def _plot_history(history_csv: Path, fig_dir: Path) -> None:
     plt.tight_layout()
     plt.savefig(fig_dir / "dice_curve.png", dpi=180)
     plt.close()
+
+    if "val_iou" in df.columns:
+        plt.figure(figsize=(8, 5))
+        plt.plot(df["epoch"], df["val_iou"], label="val_iou", linewidth=2)
+        plt.xlabel("Epoch")
+        plt.ylabel("IoU")
+        plt.title("Validation IoU")
+        plt.grid(alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(fig_dir / "iou_curve.png", dpi=180)
+        plt.close()
 
     plt.figure(figsize=(8, 5))
     plt.plot(df["epoch"], df["val_hd95"], label="val_hd95", linewidth=2)

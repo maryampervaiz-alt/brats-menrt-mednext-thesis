@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from pathlib import Path
 from typing import Any
 
 from monai.data import CacheDataset, DataLoader, Dataset
@@ -11,7 +9,6 @@ from monai.transforms import (
     Compose,
     EnsureChannelFirstd,
     EnsureTyped,
-    Invertd,
     LoadImaged,
     NormalizeIntensityd,
     Orientationd,
@@ -21,7 +18,7 @@ from monai.transforms import (
     RandGaussianNoised,
     RandScaleIntensityd,
     RandShiftIntensityd,
-    ResizeWithPadOrCropd,
+    SpatialPadd,
     Spacingd,
 )
 
@@ -43,7 +40,8 @@ def build_train_transforms(cfg: dict[str, Any]) -> Compose:
                 mode=("bilinear", "nearest"),
             ),
             NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
-            ResizeWithPadOrCropd(keys=["image", "label"], spatial_size=patch_size),
+            # Pad only when a case is smaller than the requested training patch.
+            SpatialPadd(keys=["image", "label"], spatial_size=patch_size),
             RandCropByPosNegLabeld(
                 keys=["image", "label"],
                 label_key="label",
@@ -87,7 +85,8 @@ def build_val_transforms(cfg: dict[str, Any]) -> Compose:
                 mode=("bilinear", "nearest"),
             ),
             NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
-            ResizeWithPadOrCropd(keys=["image", "label"], spatial_size=patch_size),
+            # Preserve full-volume geometry for validation; do not crop larger cases here.
+            SpatialPadd(keys=["image", "label"], spatial_size=patch_size),
             EnsureTyped(keys=["image", "label"]),
         ]
     )
@@ -104,7 +103,8 @@ def build_infer_transforms(cfg: dict[str, Any]) -> Compose:
             Orientationd(keys=["image"], axcodes="RAS", labels=None),
             Spacingd(keys=["image"], pixdim=spacing, mode=("bilinear",)),
             NormalizeIntensityd(keys=["image"], nonzero=True, channel_wise=True),
-            ResizeWithPadOrCropd(keys=["image"], spatial_size=patch_size),
+            # Preserve full-volume geometry for inference; only pad smaller cases.
+            SpatialPadd(keys=["image"], spatial_size=patch_size),
             EnsureTyped(keys=["image"]),
         ]
     )

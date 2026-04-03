@@ -51,6 +51,20 @@ def main():
     plt.savefig(dice_path, dpi=180)
     plt.close()
 
+    if "val_iou" in df.columns:
+        plt.figure(figsize=(8, 5))
+        plt.plot(df["epoch"], df["val_iou"], label="val_iou", linewidth=2)
+        plt.xlabel("Epoch")
+        plt.ylabel("IoU")
+        plt.title("Validation IoU")
+        plt.grid(alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        iou_path = out_dir / "iou_curve.png"
+        plt.savefig(iou_path, dpi=180)
+        plt.close()
+        print(f"Saved: {iou_path}")
+
     plt.figure(figsize=(8, 5))
     plt.plot(df["epoch"], df["val_hd95"], label="val_hd95", linewidth=2)
     plt.xlabel("Epoch")

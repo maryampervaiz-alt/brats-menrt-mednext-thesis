@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import importlib
 import os
+import pkgutil
 import shutil
 import subprocess
 import sys
@@ -38,6 +40,32 @@ def _require_cmd(name: str) -> None:
         raise RuntimeError(f"Required command not found in PATH: {name}")
 
 
+def _trainer_symbol_exists(trainer_name: str) -> bool:
+    roots = ["nnunetv2", "nnunet_mednext", "mednextv1"]
+    visited = set()
+    for root_name in roots:
+        try:
+            root_mod = importlib.import_module(root_name)
+        except Exception:
+            continue
+        if hasattr(root_mod, trainer_name):
+            return True
+        mod_path = getattr(root_mod, "__path__", None)
+        if mod_path is None:
+            continue
+        for mod_info in pkgutil.walk_packages(mod_path, prefix=f"{root_mod.__name__}."):
+            if mod_info.name in visited:
+                continue
+            visited.add(mod_info.name)
+            try:
+                mod = importlib.import_module(mod_info.name)
+            except Exception:
+                continue
+            if hasattr(mod, trainer_name):
+                return True
+    return False
+
+
 def _validate_track_b_config(tb: dict, mode: str) -> None:
     run_prepare = (mode in ("all", "prepare")) and bool(tb.get("run_prepare", True))
     run_preprocess = (mode in ("all", "preprocess")) and bool(tb.get("run_plan_and_preprocess", True))
@@ -60,6 +88,12 @@ def _validate_track_b_config(tb: dict, mode: str) -> None:
         _require_cmd("nnUNetv2_plan_and_preprocess")
     if run_train:
         _require_cmd("nnUNetv2_train")
+        trainer_name = str(tb.get("trainer_name", "")).strip()
+        if trainer_name and not _trainer_symbol_exists(trainer_name):
+            raise RuntimeError(
+                f"Configured trainer `{trainer_name}` was not found in the current Python environment. "
+                "Install a compatible MedNeXt/nnUNet package or update track_b.trainer_name."
+            )
     if run_findbest:
         _require_cmd("nnUNetv2_find_best_configuration")
 

@@ -36,11 +36,13 @@ def main():
         label_keywords=tuple(cfg["data"]["label_keywords"]),
         require_labels=True,
     )
+    group_pattern = str(cfg["data"].get("group_pattern", "")).strip()
     if args.mode == "holdout":
         train, val = make_holdout_split(
             records,
             val_fraction=float(cfg["data"]["val_fraction"]),
             seed=int(cfg["seed"]),
+            group_pattern=group_pattern,
         )
         payload = {
             "train_case_ids": [x.case_id for x in train],
@@ -52,7 +54,18 @@ def main():
         print(f"Saved: {out_path}")
         return
 
-    folds = build_kfold_indices(len(records), n_splits=args.k, seed=int(cfg["seed"]))
+    group_ids = None
+    if group_pattern:
+        import re
+
+        def _grp(case_id: str) -> str:
+            m = re.match(group_pattern, case_id)
+            if m and m.groups():
+                return m.group(1)
+            return case_id
+
+        group_ids = [_grp(x.case_id) for x in records]
+    folds = build_kfold_indices(len(records), n_splits=args.k, seed=int(cfg["seed"]), group_ids=group_ids)
     all_ids = [x.case_id for x in records]
     for i, (tr_idx, va_idx) in enumerate(folds):
         payload = {

@@ -103,3 +103,5 @@ python scripts/run_nnunetv2_track_b.py --config configs/track_b_nnunetv2.yaml --
 1. This protocol is nnUNet-native. It is separate from the custom MONAI scripts in this repo.
 2. `configs/track_b_nnunetv2.yaml` enforces explicit `trainer_name` by default (`require_mednext_trainer: true`).
 3. Keep both protocols documented in thesis (custom MedNeXt pipeline + strict nnUNetv2 pipeline).
+4. Do not describe the default MONAI baseline as the official MedNeXt training framework; only the architecture dependency is official there.
+5. The Track-B runner now validates that the configured trainer symbol exists in the current Python environment before training.

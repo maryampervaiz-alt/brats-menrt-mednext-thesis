@@ -39,6 +39,15 @@ def main() -> None:
     plt.savefig(out_dir / "dice_curve.png", dpi=180)
     plt.close()
 
+    if "val_iou" in df.columns:
+        plt.figure(figsize=(8, 5))
+        plt.plot(df["epoch"], df["val_iou"], label="val_iou", linewidth=2)
+        plt.grid(alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(out_dir / "iou_curve.png", dpi=180)
+        plt.close()
+
     plt.figure(figsize=(8, 5))
     plt.plot(df["epoch"], df["val_hd95"], label="val_hd95", linewidth=2)
     plt.grid(alpha=0.3)

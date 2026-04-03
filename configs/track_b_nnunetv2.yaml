@@ -4,8 +4,8 @@ track_b:
   dataset_name: BraTSMENRT
 
   # Source dataset roots (local or Kaggle-mounted).
-  train_root: /kaggle/input/brats-men-rt/BraTS-MEN-RT-Train-v2
-  val_root: /kaggle/input/brats-men-rt/BraTS-MEN-RT-Val-v1
+  train_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-TrainingData
+  val_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-ValidationData
 
   # nnUNet workspace roots.
   nnunet_raw: /kaggle/working/nnUNet_raw

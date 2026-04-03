@@ -105,7 +105,12 @@ def main() -> None:
         train_ids, val_ids = load_split_json(split_json)
         val_records = [r for r in records if r.case_id in val_ids]
     else:
-        _, val_records = make_holdout_split(records, val_fraction=float(cfg["data"]["val_fraction"]), seed=int(cfg["seed"]))
+        _, val_records = make_holdout_split(
+            records,
+            val_fraction=float(cfg["data"]["val_fraction"]),
+            seed=int(cfg["seed"]),
+            group_pattern=str(cfg["data"].get("group_pattern", "")).strip(),
+        )
 
     if not val_records:
         raise RuntimeError("No validation records found.")
@@ -160,9 +165,9 @@ def main() -> None:
                 overlap=float(cfg["inference"]["overlap"]),
                 mode="gaussian",
             )
-            loss = float(loss_fn(logits, label).detach().cpu().item())
             if isinstance(logits, (list, tuple)):
                 logits = logits[0]
+            loss = float(loss_fn(logits, label).detach().cpu().item())
 
             processed = post({"pred": logits, "label": label})
             pred_bin = processed["pred"]
