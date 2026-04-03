@@ -50,6 +50,25 @@ def _find_files_case_insensitive(root: Path, pattern: str) -> list[Path]:
     return []
 
 
+def _match_files_in_dir(case_dir: Path, pattern: str) -> list[Path]:
+    pattern_lower = pattern.lower().strip()
+    files = [p for p in case_dir.iterdir() if p.is_file()]
+    if not pattern_lower:
+        return sorted(files)
+
+    exact_suffix_matches = sorted([p for p in files if p.name.lower().endswith(pattern_lower)])
+    if exact_suffix_matches:
+        return exact_suffix_matches
+
+    token = pattern_lower.replace(".nii.gz", "").replace(".nii", "").strip("_- ")
+    if token:
+        substring_matches = sorted([p for p in files if token in p.name.lower()])
+        if substring_matches:
+            return substring_matches
+
+    return []
+
+
 def _find_case_dirs(
     root: Path,
     image_keyword: str,
@@ -71,7 +90,7 @@ def _find_case_dirs(
             continue
         seen_case_dirs.add(case_dir)
         if label_keyword is not None:
-            labels = sorted([p for p in case_dir.iterdir() if p.is_file() and p.name.lower().endswith(label_keyword.lower())])
+            labels = _match_files_in_dir(case_dir, label_keyword)
             if len(labels) == 0:
                 missing_labels.append(case_id)
                 continue
