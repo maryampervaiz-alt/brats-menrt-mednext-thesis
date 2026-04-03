@@ -48,6 +48,11 @@ def _copy_or_link(src: Path, dst: Path, mode: str) -> None:
     shutil.copy2(src, dst)
 
 
+def _progress_every(index: int, total: int, kind: str, case_id: str) -> None:
+    if index == 1 or index == total or index % 25 == 0:
+        print(f"[{kind}] processed {index}/{total}: {case_id}", flush=True)
+
+
 def _clear_dir(path: Path) -> None:
     if not path.exists():
         path.mkdir(parents=True, exist_ok=True)
@@ -222,9 +227,11 @@ def main() -> None:
         raise RuntimeError("No labeled cases found. Check train root and keywords.")
 
     unique_case_ids = {case_id for case_id, _, _ in training_cases}
-    for case_id, img, lbl in training_cases:
+    total_train = len(training_cases)
+    for idx, (case_id, img, lbl) in enumerate(training_cases, start=1):
         _copy_or_link(img, images_tr / f"{case_id}_0000.nii.gz", args.copy_mode)
         _copy_or_link(lbl, labels_tr / f"{case_id}.nii.gz", args.copy_mode)
+        _progress_every(idx, total_train, "train", case_id)
 
     test_cases: list[tuple[str, Path]] = []
     if val_root is not None and val_root.exists():
@@ -232,8 +239,10 @@ def main() -> None:
         overlap = unique_case_ids.intersection({case_id for case_id, _ in test_cases})
         if overlap:
             raise RuntimeError(f"Detected overlap between train and val case IDs: {sorted(list(overlap))[:10]}")
-        for case_id, img in test_cases:
+        total_val = len(test_cases)
+        for idx, (case_id, img) in enumerate(test_cases, start=1):
             _copy_or_link(img, images_ts / f"{case_id}_0000.nii.gz", args.copy_mode)
+            _progress_every(idx, total_val, "val", case_id)
 
     _write_dataset_json(task_dir / "dataset.json", args.task_name, training_cases, test_cases)
     _write_command_sheet(
