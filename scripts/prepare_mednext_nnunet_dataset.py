@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import json
 import shutil
 from pathlib import Path
@@ -32,6 +33,18 @@ def _copy_or_link(src: Path, dst: Path, mode: str) -> None:
             return
         except Exception:
             pass
+    # nnU-Net expects .nii.gz. If the source dataset ships .nii files,
+    # convert them to valid gzipped NIfTI on the fly instead of merely renaming
+    # the extension, which would be incorrect and also waste more disk space.
+    if src.suffix.lower() == ".nii" and dst.name.lower().endswith(".nii.gz"):
+        try:
+            with src.open("rb") as fsrc, gzip.open(dst, "wb", compresslevel=6) as fdst:
+                shutil.copyfileobj(fsrc, fdst, length=1024 * 1024)
+        except Exception:
+            if dst.exists():
+                dst.unlink()
+            raise
+        return
     shutil.copy2(src, dst)
 
 
