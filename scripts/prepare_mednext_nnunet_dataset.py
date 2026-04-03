@@ -46,9 +46,25 @@ def _clear_dir(path: Path) -> None:
             item.unlink()
 
 
-def _find_files_case_insensitive(root: Path, suffix: str) -> list[Path]:
-    suffix_lower = suffix.lower()
-    return sorted([p for p in root.rglob("*") if p.is_file() and p.name.lower().endswith(suffix_lower)])
+def _find_files_case_insensitive(root: Path, pattern: str) -> list[Path]:
+    pattern_lower = pattern.lower().strip()
+    files = [p for p in root.rglob("*") if p.is_file()]
+    if not pattern_lower:
+        return sorted(files)
+
+    exact_suffix_matches = sorted([p for p in files if p.name.lower().endswith(pattern_lower)])
+    if exact_suffix_matches:
+        return exact_suffix_matches
+
+    # Fallback to substring matching so small naming differences are surfaced early
+    # instead of silently reporting zero discoverable cases.
+    token = pattern_lower.replace(".nii.gz", "").replace(".nii", "").strip("_- ")
+    if token:
+        substring_matches = sorted([p for p in files if token in p.name.lower()])
+        if substring_matches:
+            return substring_matches
+
+    return []
 
 
 def _collect_labeled_cases(root: Path, image_kw: str, label_kw: str) -> list[tuple[str, Path, Path]]:

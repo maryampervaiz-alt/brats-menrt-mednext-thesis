@@ -31,9 +31,23 @@ def _set_nnunet_env_from_cfg(cfg: dict) -> None:
     os.environ["RESULTS_FOLDER"] = str(cfg["results_folder"])
 
 
-def _find_files_case_insensitive(root: Path, suffix: str) -> list[Path]:
-    suffix_lower = suffix.lower()
-    return sorted([p for p in root.rglob("*") if p.is_file() and p.name.lower().endswith(suffix_lower)])
+def _find_files_case_insensitive(root: Path, pattern: str) -> list[Path]:
+    pattern_lower = pattern.lower().strip()
+    files = [p for p in root.rglob("*") if p.is_file()]
+    if not pattern_lower:
+        return sorted(files)
+
+    exact_suffix_matches = sorted([p for p in files if p.name.lower().endswith(pattern_lower)])
+    if exact_suffix_matches:
+        return exact_suffix_matches
+
+    token = pattern_lower.replace(".nii.gz", "").replace(".nii", "").strip("_- ")
+    if token:
+        substring_matches = sorted([p for p in files if token in p.name.lower()])
+        if substring_matches:
+            return substring_matches
+
+    return []
 
 
 def _find_case_dirs(
@@ -72,6 +86,10 @@ def _find_case_dirs(
             duplicate_case_ids[case_id] = sorted(str(d) for d in dirs)
 
     return sorted(case_dirs), duplicate_case_ids, sorted(missing_labels), len(image_files), sample_images
+
+
+def _sample_files(root: Path, limit: int = 20) -> list[str]:
+    return [str(p) for p in sorted([p for p in root.rglob("*") if p.is_file()])[:limit]]
 
 
 def _locate_trainer(base_trainer: str) -> dict:
@@ -133,12 +151,14 @@ def main() -> None:
         report["train_sample_images"] = train_sample_images
         report["train_duplicate_case_ids"] = train_duplicates
         report["train_missing_labels"] = missing_labels
+        report["train_sample_files"] = _sample_files(train_root)
     else:
         report["train_case_count"] = 0
         report["train_image_match_count"] = 0
         report["train_sample_images"] = []
         report["train_duplicate_case_ids"] = {}
         report["train_missing_labels"] = []
+        report["train_sample_files"] = []
 
     if val_root is not None and val_root.exists():
         val_cases, val_duplicates, _, val_image_count, val_sample_images = _find_case_dirs(
@@ -153,12 +173,14 @@ def main() -> None:
         train_case_ids = {p.name for p in train_cases} if train_root.exists() else set()
         val_case_ids = {p.name for p in val_cases}
         report["train_val_overlap_case_ids"] = sorted(train_case_ids.intersection(val_case_ids))
+        report["val_sample_files"] = _sample_files(val_root)
     else:
         report["val_case_count"] = 0
         report["val_image_match_count"] = 0
         report["val_sample_images"] = []
         report["val_duplicate_case_ids"] = {}
         report["train_val_overlap_case_ids"] = []
+        report["val_sample_files"] = []
 
     if args.check_trainer:
         try:
