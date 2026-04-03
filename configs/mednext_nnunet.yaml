@@ -1,0 +1,38 @@
+mednext_nnunet:
+  name: mednext_official_nnunet_v1
+
+  task_id: 502
+  task_name: Task502_BraTSMENRT
+
+  train_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-TrainingData
+  val_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-ValidationData
+
+  nnunet_raw_data_base: /kaggle/working/nnUNet_raw_data_base
+  nnunet_preprocessed: /kaggle/working/nnUNet_preprocessed
+  results_folder: /kaggle/working/nnUNet_results
+
+  image_keyword: _t1c.nii.gz
+  label_keyword: _gtv.nii.gz
+  copy_mode: copy
+  clean_task_output: true
+
+  planner_3d: ExperimentPlanner3D_v21_customTargetSpacing_1x1x1
+  planner_2d: None
+  network: 3d_fullres
+  plans_identifier: nnUNetPlansv2.1_trgSp_1x1x1
+
+  predict_input: ""
+  predict_output: /kaggle/working/mednext_predictions
+
+  base_trainer: nnUNetTrainerV2_MedNeXt_S_kernel3
+  trainer_name: nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT
+  trainer_epochs_env: MEDNEXT_MAX_EPOCHS
+  max_epochs: 20
+  continue_training: false
+
+  folds: [0, 1, 2, 3, 4]
+
+  run_prepare: true
+  run_plan_and_preprocess: true
+  run_install_trainer: true
+  run_train: true

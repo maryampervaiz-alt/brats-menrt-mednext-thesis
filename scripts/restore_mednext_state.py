@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Restore an archived run directory into the current repository.")
+    p = argparse.ArgumentParser(description="Restore archived MedNeXt nnU-Net(v1) state into current workspace.")
     p.add_argument("--archive", type=str, required=True)
     p.add_argument("--dest", type=str, default=".")
     return p.parse_args()

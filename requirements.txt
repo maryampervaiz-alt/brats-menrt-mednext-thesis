@@ -1,15 +1,8 @@
-torch>=2.2.0
-monai>=1.3.2
-nibabel>=5.2.1
 numpy>=1.26.4
 pandas>=2.2.2
-scikit-learn>=1.5.1
 matplotlib>=3.9.0
 pyyaml>=6.0.2
-tqdm>=4.66.4
 tensorboard>=2.17.0
 simpleitk>=2.3.1
 scipy>=1.11.4
-schedulefree>=1.3
-nnunetv2>=2.4.2
 git+https://github.com/MIC-DKFZ/MedNeXt.git

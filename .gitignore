@@ -24,5 +24,12 @@ splits/
 
 # Data archives and extracted datasets
 *.zip
+*.tar.gz
 *.nii
 *.nii.gz
+
+# nnU-Net / MedNeXt workspaces
+nnUNet_raw_data_base/
+nnUNet_preprocessed/
+nnUNet_results/
+archives/
