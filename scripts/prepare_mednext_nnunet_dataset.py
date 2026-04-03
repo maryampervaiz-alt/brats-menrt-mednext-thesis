@@ -178,12 +178,12 @@ def _write_dataset_json(path: Path, task_name: str, training_cases: list[tuple[s
         "numTest": int(len(test_cases)),
         "training": [
             {
-                "image": f"./imagesTr/{case_id}_0000.nii.gz",
+                "image": f"./imagesTr/{case_id}.nii.gz",
                 "label": f"./labelsTr/{case_id}.nii.gz",
             }
             for case_id, _, _ in training_cases
         ],
-        "test": [f"./imagesTs/{case_id}_0000.nii.gz" for case_id, _ in test_cases],
+        "test": [f"./imagesTs/{case_id}.nii.gz" for case_id, _ in test_cases],
     }
     path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
