@@ -11,12 +11,13 @@
 
 ## Cross-Validation (Phase-1)
 
-1. Run 5-fold training (`scripts/train_cv.py`).
+1. For Kaggle safety, prefer one fold at a time (`scripts/run_fold.py`) instead of all 5 folds in one session.
 2. Save each fold split JSON (`outputs/splits/kfold_*_fold*.json`).
 3. Save each fold best checkpoint (`outputs/<run_prefix>_foldX/checkpoints/best_model.pt`).
-4. Build ensemble predictions with `scripts/infer_ensemble_cv.py`.
-5. Report mean and std across folds for Dice and HD95.
-6. Confirm grouped splitting assumptions from `data.group_pattern` match the dataset naming scheme.
+4. Archive each completed fold (`scripts/archive_run.py`) before ending the session.
+5. Build ensemble predictions with `scripts/infer_ensemble_cv.py`.
+6. Report mean and std across folds for Dice and HD95.
+7. Confirm grouped splitting assumptions from `data.group_pattern` match the dataset naming scheme.
 
 ## Phase-2 Protocol (Paper-Inspired)
 

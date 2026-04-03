@@ -88,6 +88,44 @@ This creates fold runs:
 - `outputs/menrt_cv_fold3`
 - `outputs/menrt_cv_fold4`
 
+Resume-safe Kaggle recommendation:
+- run one fold at a time with a fixed run name
+- archive each completed fold
+- save a Kaggle notebook version after each fold
+
+Single-fold runner:
+
+```bash
+python scripts/run_fold.py --config configs/default.yaml --run-prefix menrt_cv --fold-index 0 --n-folds 5 --strict-split --auto-evaluate --archive-after-run
+```
+
+Re-running the same command resumes automatically from:
+- `outputs/menrt_cv_fold0/checkpoints/latest_checkpoint.pt`
+
+Chunked Kaggle example:
+
+```bash
+python scripts/run_fold.py --config configs/default.yaml --run-prefix menrt_cv --fold-index 0 --n-folds 5 --epochs 30 --strict-split --auto-evaluate --archive-after-run
+```
+
+Then in the next session restore the archive and continue the same fold to a higher total epoch count, for example:
+
+```bash
+python scripts/run_fold.py --config configs/default.yaml --run-prefix menrt_cv --fold-index 0 --n-folds 5 --epochs 60 --strict-split --auto-evaluate --archive-after-run
+```
+
+Archive one completed fold:
+
+```bash
+python scripts/archive_run.py --run-name menrt_cv_fold0 --split-json outputs/splits/kfold_5_fold0.json
+```
+
+Restore an archived fold before resuming:
+
+```bash
+python scripts/restore_run.py --archive /path/to/menrt_cv_fold0.tar.gz
+```
+
 Ensemble inference from fold checkpoints:
 
 ```bash

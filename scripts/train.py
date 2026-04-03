@@ -68,6 +68,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--n-folds", type=int, default=-1)
     p.add_argument("--fold-index", type=int, default=-1)
     p.add_argument("--lr", type=float, default=-1.0)
+    p.add_argument("--epochs", type=int, default=-1)
     p.add_argument("--patch-size", type=int, nargs=3, default=None, metavar=("X", "Y", "Z"))
     p.add_argument(
         "--strict-split",
@@ -282,6 +283,8 @@ def main() -> None:
         cfg["system"]["num_workers"] = int(cfg["debug"].get("num_workers", 0))
     if args.lr > 0:
         cfg["training"]["lr"] = float(args.lr)
+    if args.epochs > 0:
+        cfg["training"]["epochs"] = int(args.epochs)
     if args.patch_size is not None:
         cfg["transforms"]["patch_size"] = [int(v) for v in args.patch_size]
 
