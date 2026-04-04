@@ -34,6 +34,8 @@ mednext_nnunet:
   base_trainer: nnUNetTrainerV2_MedNeXt_S_kernel3
   trainer_name: nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT
   trainer_epochs_env: MEDNEXT_MAX_EPOCHS
+  trainer_unpack_env: MEDNEXT_UNPACK_DATA
+  unpack_preprocessed: false
   max_epochs: 20
   continue_training: false
 

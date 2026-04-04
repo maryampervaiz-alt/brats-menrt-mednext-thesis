@@ -13,6 +13,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--new-trainer", type=str, required=True)
     p.add_argument("--epochs-env", type=str, default="MEDNEXT_MAX_EPOCHS")
     p.add_argument("--default-epochs", type=int, default=20)
+    p.add_argument("--unpack-env", type=str, default="MEDNEXT_UNPACK_DATA")
+    p.add_argument("--default-unpack", type=int, default=0, choices=[0, 1])
     return p.parse_args()
 
 
@@ -58,10 +60,12 @@ class {args.new_trainer}({args.base_trainer}):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         max_epochs = int(os.environ.get("{args.epochs_env}", "{args.default_epochs}"))
+        unpack_data = bool(int(os.environ.get("{args.unpack_env}", "{args.default_unpack}")))
         if hasattr(self, "max_num_epochs"):
             self.max_num_epochs = max_epochs
         if hasattr(self, "num_epochs"):
             self.num_epochs = max_epochs
+        self.unpack_data = unpack_data
 '''
     out_file.write_text(code, encoding="utf-8")
     print(f"Installed trainer wrapper: {out_file}")

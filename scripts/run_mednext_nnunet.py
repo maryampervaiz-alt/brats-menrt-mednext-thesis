@@ -46,6 +46,8 @@ def _append_command_log(log_file: Path | None, cmd: list[str], env: dict[str, st
     }
     if "MEDNEXT_MAX_EPOCHS" in env:
         tracked_env["MEDNEXT_MAX_EPOCHS"] = env["MEDNEXT_MAX_EPOCHS"]
+    if "MEDNEXT_UNPACK_DATA" in env:
+        tracked_env["MEDNEXT_UNPACK_DATA"] = env["MEDNEXT_UNPACK_DATA"]
     with log_file.open("a", encoding="utf-8") as f:
         f.write(f"[{datetime.now().isoformat(timespec='seconds')}]\n")
         f.write(f"CMD: {' '.join(cmd)}\n")
@@ -73,6 +75,7 @@ def _write_runtime_snapshot(env: dict[str, str], artifacts_dir: Path) -> None:
             "nnUNet_preprocessed": env.get("nnUNet_preprocessed", ""),
             "RESULTS_FOLDER": env.get("RESULTS_FOLDER", ""),
             "MEDNEXT_MAX_EPOCHS": env.get("MEDNEXT_MAX_EPOCHS", ""),
+            "MEDNEXT_UNPACK_DATA": env.get("MEDNEXT_UNPACK_DATA", ""),
         },
     }
     (artifacts_dir / "runtime_snapshot.json").write_text(
@@ -143,6 +146,7 @@ def _build_env(cfg: dict, max_epochs_override: int = -1) -> dict[str, str]:
     env["nnUNet_preprocessed"] = str(cfg["nnunet_preprocessed"])
     env["RESULTS_FOLDER"] = str(cfg["results_folder"])
     env[str(cfg["trainer_epochs_env"])] = str(max_epochs_override if max_epochs_override > 0 else cfg["max_epochs"])
+    env[str(cfg.get("trainer_unpack_env", "MEDNEXT_UNPACK_DATA"))] = "1" if bool(cfg.get("unpack_preprocessed", False)) else "0"
     return env
 
 
@@ -217,6 +221,10 @@ def _install_trainer(cfg: dict, env: dict[str, str], dry_run: bool, log_file: Pa
         str(cfg["trainer_epochs_env"]),
         "--default-epochs",
         str(cfg["max_epochs"]),
+        "--unpack-env",
+        str(cfg.get("trainer_unpack_env", "MEDNEXT_UNPACK_DATA")),
+        "--default-unpack",
+        "1" if bool(cfg.get("unpack_preprocessed", False)) else "0",
     ]
     _run(cmd, env=env, dry_run=dry_run, log_file=log_file)
 
