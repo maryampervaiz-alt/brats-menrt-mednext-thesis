@@ -48,6 +48,8 @@ def _append_command_log(log_file: Path | None, cmd: list[str], env: dict[str, st
         tracked_env["MEDNEXT_MAX_EPOCHS"] = env["MEDNEXT_MAX_EPOCHS"]
     if "MEDNEXT_UNPACK_DATA" in env:
         tracked_env["MEDNEXT_UNPACK_DATA"] = env["MEDNEXT_UNPACK_DATA"]
+    if "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD" in env:
+        tracked_env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"]
     with log_file.open("a", encoding="utf-8") as f:
         f.write(f"[{datetime.now().isoformat(timespec='seconds')}]\n")
         f.write(f"CMD: {' '.join(cmd)}\n")
@@ -76,6 +78,7 @@ def _write_runtime_snapshot(env: dict[str, str], artifacts_dir: Path) -> None:
             "RESULTS_FOLDER": env.get("RESULTS_FOLDER", ""),
             "MEDNEXT_MAX_EPOCHS": env.get("MEDNEXT_MAX_EPOCHS", ""),
             "MEDNEXT_UNPACK_DATA": env.get("MEDNEXT_UNPACK_DATA", ""),
+            "TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD": env.get("TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD", ""),
         },
     }
     (artifacts_dir / "runtime_snapshot.json").write_text(
@@ -147,6 +150,8 @@ def _build_env(cfg: dict, max_epochs_override: int = -1) -> dict[str, str]:
     env["RESULTS_FOLDER"] = str(cfg["results_folder"])
     env[str(cfg["trainer_epochs_env"])] = str(max_epochs_override if max_epochs_override > 0 else cfg["max_epochs"])
     env[str(cfg.get("trainer_unpack_env", "MEDNEXT_UNPACK_DATA"))] = "1" if bool(cfg.get("unpack_preprocessed", False)) else "0"
+    if bool(cfg.get("torch_force_no_weights_only_load", True)):
+        env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
     return env
 
 

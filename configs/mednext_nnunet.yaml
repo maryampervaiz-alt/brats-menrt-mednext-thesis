@@ -38,6 +38,7 @@ mednext_nnunet:
   trainer_epochs_env: MEDNEXT_MAX_EPOCHS
   trainer_unpack_env: MEDNEXT_UNPACK_DATA
   unpack_preprocessed: false
+  torch_force_no_weights_only_load: true
   max_epochs: 20
   continue_training: false
 
