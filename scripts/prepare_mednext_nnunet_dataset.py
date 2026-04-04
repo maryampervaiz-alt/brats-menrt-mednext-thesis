@@ -250,14 +250,18 @@ def _assign_volume_strata(
     num_bins: int,
 ) -> dict[str, dict[str, int]]:
     if num_bins <= 1 or len(training_cases) <= 1:
-        return {
-            case_id: {"foreground_voxels": _foreground_voxel_count(lbl), "stratum_id": 0}
-            for case_id, _, lbl in training_cases
-        }
+        strata = {}
+        total = len(training_cases)
+        for idx, (case_id, _, lbl) in enumerate(training_cases, start=1):
+            strata[case_id] = {"foreground_voxels": _foreground_voxel_count(lbl), "stratum_id": 0}
+            _progress_every(idx, total, "strata", case_id)
+        return strata
 
     scored_cases = []
-    for case_id, _, lbl in training_cases:
+    total = len(training_cases)
+    for idx, (case_id, _, lbl) in enumerate(training_cases, start=1):
         scored_cases.append((case_id, _foreground_voxel_count(lbl)))
+        _progress_every(idx, total, "strata", case_id)
 
     scored_cases.sort(key=lambda x: (x[1], x[0]))
     strata: dict[str, dict[str, int]] = {}
@@ -370,6 +374,12 @@ def main() -> None:
     training_cases_all = _collect_labeled_cases(train_root, args.image_keyword, args.label_keyword)
     if not training_cases_all:
         raise RuntimeError("No labeled cases found. Check train root and keywords.")
+    print(f"Discovered labeled train cases: {len(training_cases_all)}", flush=True)
+    print(
+        f"Computing train strata using strategy={args.train_subset_strategy}, "
+        f"bins={args.stratify_volume_bins}, seed={args.subset_seed}",
+        flush=True,
+    )
     train_case_metadata = _assign_volume_strata(training_cases_all, args.stratify_volume_bins)
     if args.train_subset_strategy == "stratified_label_volume":
         training_cases = _select_subset_stratified(
@@ -404,6 +414,7 @@ def main() -> None:
     test_cases: list[tuple[str, Path]] = []
     if val_root is not None and val_root.exists():
         test_cases_all = _collect_unlabeled_cases(val_root, args.image_keyword)
+        print(f"Discovered image-only val/test cases: {len(test_cases_all)}", flush=True)
         if args.val_subset_strategy == "random":
             test_cases = _select_subset(test_cases_all, args.val_case_limit, args.subset_seed, seed_offset=100003)
         else:
