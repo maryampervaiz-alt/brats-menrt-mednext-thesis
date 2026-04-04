@@ -28,7 +28,7 @@ pip install -r requirements.txt
 This installs:
 
 - official MedNeXt package
-- explicit `nnunet==1.7.1` so `nnUNet_predict` is available consistently
+- explicit `nnunet==1.7.1` plus official MedNeXt console scripts such as `mednextv1_predict`
 
 ## Main Config
 

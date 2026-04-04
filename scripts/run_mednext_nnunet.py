@@ -25,8 +25,8 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--fold", type=int, default=-1, help="Override config folds and run a single fold.")
     p.add_argument("--max-epochs", type=int, default=-1, help="Override configured max epochs.")
     p.add_argument("--continue-training", action="store_true")
-    p.add_argument("--predict-input", type=str, default="", help="Override prediction input folder for nnUNet_predict.")
-    p.add_argument("--predict-output", type=str, default="", help="Override prediction output folder for nnUNet_predict.")
+    p.add_argument("--predict-input", type=str, default="", help="Override prediction input folder for mednextv1_predict.")
+    p.add_argument("--predict-output", type=str, default="", help="Override prediction output folder for mednextv1_predict.")
     p.add_argument("--dry-run", action="store_true")
     return p.parse_args()
 
@@ -297,7 +297,7 @@ def _predict(
     log_file: Path | None = None,
 ) -> None:
     if not dry_run:
-        _require_cmd("nnUNet_predict")
+        _require_cmd("mednextv1_predict")
     folds = [fold_override] if fold_override >= 0 else list(cfg.get("folds", [0]))
     input_dir = str(predict_input or cfg.get("predict_input", "")).strip()
     output_dir = str(predict_output or cfg.get("predict_output", "")).strip()
@@ -309,7 +309,7 @@ def _predict(
         output_dir = str(Path(output_dir) / f"fold_{fold_override}")
 
     cmd = [
-        "nnUNet_predict",
+        "mednextv1_predict",
         "-i",
         input_dir,
         "-o",

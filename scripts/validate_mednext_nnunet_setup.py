@@ -166,7 +166,7 @@ def main() -> None:
         "required_commands": {
             "mednextv1_plan_and_preprocess": shutil.which("mednextv1_plan_and_preprocess") is not None,
             "mednextv1_train": shutil.which("mednextv1_train") is not None,
-            "nnUNet_predict": shutil.which("nnUNet_predict") is not None,
+            "mednextv1_predict": shutil.which("mednextv1_predict") is not None,
         },
     }
 
