@@ -52,6 +52,10 @@ def _get_stage_cfg(plans: dict, stage: int) -> dict:
     raise KeyError("Could not access plans_per_stage for requested stage.")
 
 
+def _as_int_list(values) -> list[int]:
+    return [int(v) for v in values]
+
+
 def main() -> None:
     args = parse_args()
     cfg = _load_cfg(args.config)
@@ -73,11 +77,11 @@ def main() -> None:
         plans = pickle.load(f)
 
     stage_cfg = _get_stage_cfg(plans, args.stage)
-    old_patch = list(np.asarray(stage_cfg["patch_size"]).astype(int))
+    old_patch = _as_int_list(np.asarray(stage_cfg["patch_size"]).astype(int))
     old_batch = int(stage_cfg["batch_size"])
-    pools = list(stage_cfg["num_pool_per_axis"])
+    pools = _as_int_list(stage_cfg["num_pool_per_axis"])
 
-    required_divisibility = [2 ** int(n) for n in pools]
+    required_divisibility = _as_int_list(2 ** int(n) for n in pools)
     for axis, (size, div) in enumerate(zip(patch_size, required_divisibility)):
         if size % div != 0:
             raise ValueError(
