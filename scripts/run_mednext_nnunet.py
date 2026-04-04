@@ -20,7 +20,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         type=str,
         default="all",
-        choices=["all", "prepare", "preprocess", "make-splits", "install-trainer", "train", "predict"],
+        choices=["all", "prepare", "preprocess", "patch-plans", "make-splits", "install-trainer", "train", "predict"],
     )
     p.add_argument("--fold", type=int, default=-1, help="Override config folds and run a single fold.")
     p.add_argument("--max-epochs", type=int, default=-1, help="Override configured max epochs.")
@@ -245,6 +245,22 @@ def _make_splits(
     _run(cmd, env=env, dry_run=dry_run, log_file=log_file)
 
 
+def _patch_plans(
+    cfg: dict,
+    config_path: str,
+    env: dict[str, str],
+    dry_run: bool,
+    log_file: Path | None = None,
+) -> None:
+    cmd = [
+        sys.executable,
+        "scripts/patch_mednext_training_plans.py",
+        "--config",
+        str(config_path),
+    ]
+    _run(cmd, env=env, dry_run=dry_run, log_file=log_file)
+
+
 def _train(
     cfg: dict,
     env: dict[str, str],
@@ -325,6 +341,8 @@ def main() -> None:
         _prepare(cfg, env=env, dry_run=args.dry_run, log_file=log_file)
     if args.mode in ("all", "preprocess") and bool(cfg.get("run_plan_and_preprocess", True)):
         _preprocess(cfg, env=env, dry_run=args.dry_run, log_file=log_file)
+    if args.mode in ("all", "patch-plans") and bool(cfg.get("run_patch_plans", True)):
+        _patch_plans(cfg, args.config, env=env, dry_run=args.dry_run, log_file=log_file)
     if args.mode in ("all", "make-splits") and bool(cfg.get("run_make_splits", True)):
         _make_splits(cfg, args.config, env=env, dry_run=args.dry_run, log_file=log_file)
     if args.mode in ("all", "install-trainer") and bool(cfg.get("run_install_trainer", True)):

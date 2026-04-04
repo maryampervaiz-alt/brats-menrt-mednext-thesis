@@ -120,6 +120,19 @@ This follows the official MedNeXt planner strategy:
 - `1mm` isotropic spacing
 - `128x128x128` planner target conditions used by the official MedNeXt internal pipeline
 
+### 3.5) Patch training plans for Kaggle-safe smoke tests
+
+```bash
+python scripts/patch_mednext_training_plans.py --config configs/mednext_nnunet.yaml
+```
+
+Current smoke-test defaults patch the training plans to:
+
+- `patch_size: [96, 96, 96]`
+- `batch_size: 1`
+
+This is applied after preprocessing, so you do not need to rerun preprocessing to reduce GPU memory use.
+
 ### 4) Install thin MEN-RT trainer wrapper
 
 ```bash

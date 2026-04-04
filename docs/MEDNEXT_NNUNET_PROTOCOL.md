@@ -68,6 +68,17 @@ $env:RESULTS_FOLDER="C:\path\to\nnUNet_results"
 mednextv1_plan_and_preprocess -t 502 -pl3d ExperimentPlanner3D_v21_customTargetSpacing_1x1x1 -pl2d None
 ```
 
+### 3.5) Patch training plans for Kaggle-safe smoke tests
+
+```bash
+python scripts/patch_mednext_training_plans.py --config configs/mednext_nnunet.yaml
+```
+
+Current smoke-test defaults patch the training plans to:
+
+- `patch_size: [96, 96, 96]`
+- `batch_size: 1`
+
 ### 4) Install thin MEN-RT trainer wrapper
 
 ```bash
