@@ -19,6 +19,7 @@ Use this wording in thesis/viva:
 2. Training framework: **official MedNeXt nnU-Net(v1)-based pipeline**
 3. Preprocessing: **official MedNeXt planner with 1mm isotropic target spacing**
 4. Training strategy: **5-fold cross-validation**
+5. Engineering strategy: **deterministic subset smoke test before full-dataset execution**
 
 ## Core Commands
 
@@ -33,6 +34,17 @@ python scripts/prepare_mednext_nnunet_dataset.py \
   --task-name Task502_BraTSMENRT \
   --clean-output
 ```
+
+Current config defaults are intentionally smoke-test oriented:
+
+- `train_case_limit: 150`
+- `val_case_limit: 20`
+- `subset_seed: 42`
+- `train_subset_strategy: stratified_label_volume`
+- `stratify_volume_bins: 5`
+- `split_seed: 42`
+
+The selected cases are recorded in `subset_manifest.json`.
 
 ### 2) Set official nnU-Net(v1) environment variables
 
@@ -72,6 +84,21 @@ python scripts/install_mednext_custom_trainer.py \
 python scripts/validate_mednext_nnunet_setup.py --config configs/mednext_nnunet.yaml --check-trainer
 ```
 
+This validation step should be treated as mandatory before long Kaggle runs. It reports:
+
+- full discovered train/val counts
+- effective subset counts after limits are applied
+- approximate per-fold train/validation counts for the configured number of folds
+- whether the current subset is compatible with 5-fold CV
+
+### 4.75) Generate stratified splits before training
+
+```bash
+python scripts/create_mednext_stratified_splits.py --config configs/mednext_nnunet.yaml
+```
+
+This writes `splits_final.pkl` for nnU-Net(v1) and a JSON summary of case strata.
+
 ### 5) Train one fold for initial 20-epoch warm-start
 
 ```bash
@@ -105,12 +132,14 @@ If `predict_input` is empty, the runner uses the prepared official task `imagesT
 
 Recommended:
 
-1. Prepare + preprocess once.
-2. Train one fold at a time.
-3. Start each fold with `MEDNEXT_MAX_EPOCHS=20`.
-4. Inspect coarse segmentation quality for SAM-Med3D prompting.
-5. Archive fold state after each session.
-6. Resume later with a higher `MEDNEXT_MAX_EPOCHS` and `-c`.
+1. First validate the repository on the deterministic subset smoke test.
+2. Prepare + preprocess once.
+3. Train one fold at a time.
+4. Start each fold with `MEDNEXT_MAX_EPOCHS=20`.
+5. Inspect coarse segmentation quality for SAM-Med3D prompting.
+6. Archive fold state after each session.
+7. Resume later with a higher `MEDNEXT_MAX_EPOCHS` and `-c`.
+8. Only after smoke-test success, switch `train_case_limit: 0` and `val_case_limit: 0` for full-dataset runs.
 
 ## Archive / Restore
 
@@ -133,3 +162,14 @@ After official training finishes, export real CSV summaries:
 ```bash
 python scripts/export_mednext_results.py --config configs/mednext_nnunet.yaml
 ```
+
+## Reproducibility Artifacts
+
+Each runner invocation also writes:
+
+- `command_history.log`
+- `mednext_nnunet_config_snapshot.yaml`
+- `runtime_snapshot.json`
+- `pip_freeze.txt`
+- `git_head.txt`
+- `stratified_splits_summary.json`

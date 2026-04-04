@@ -143,6 +143,8 @@ def main() -> None:
     args = parse_args()
     cfg = _load_cfg(args.config)
     _set_nnunet_env_from_cfg(cfg)
+    folds = list(cfg.get("folds", [0, 1, 2, 3, 4]))
+    num_folds = len(folds)
 
     train_root = Path(cfg["train_root"])
     val_root = Path(cfg["val_root"]) if str(cfg.get("val_root", "")).strip() else None
@@ -150,6 +152,15 @@ def main() -> None:
     report: dict[str, object] = {
         "config_path": str(Path(args.config).resolve()),
         "task_name": str(cfg["task_name"]),
+        "configured_folds": folds,
+        "num_folds": num_folds,
+        "configured_train_case_limit": int(cfg.get("train_case_limit", 0) or 0),
+        "configured_val_case_limit": int(cfg.get("val_case_limit", 0) or 0),
+        "subset_seed": int(cfg.get("subset_seed", 42) or 42),
+        "train_subset_strategy": str(cfg.get("train_subset_strategy", "stratified_label_volume")),
+        "val_subset_strategy": str(cfg.get("val_subset_strategy", "random")),
+        "stratify_volume_bins": int(cfg.get("stratify_volume_bins", 5) or 5),
+        "split_seed": int(cfg.get("split_seed", cfg.get("subset_seed", 42)) or 42),
         "train_root_exists": train_root.exists(),
         "val_root_exists": bool(val_root.exists()) if val_root is not None else False,
         "required_commands": {
@@ -166,6 +177,10 @@ def main() -> None:
             label_keyword=str(cfg["label_keyword"]),
         )
         report["train_case_count"] = len(train_cases)
+        report["effective_train_case_count"] = min(
+            len(train_cases),
+            int(cfg.get("train_case_limit", 0) or 0) if int(cfg.get("train_case_limit", 0) or 0) > 0 else len(train_cases),
+        )
         report["train_image_match_count"] = train_image_count
         report["train_sample_images"] = train_sample_images
         report["train_duplicate_case_ids"] = train_duplicates
@@ -173,11 +188,25 @@ def main() -> None:
         report["train_sample_files"] = _sample_files(train_root)
     else:
         report["train_case_count"] = 0
+        report["effective_train_case_count"] = 0
         report["train_image_match_count"] = 0
         report["train_sample_images"] = []
         report["train_duplicate_case_ids"] = {}
         report["train_missing_labels"] = []
         report["train_sample_files"] = []
+
+    effective_train_case_count = int(report["effective_train_case_count"])
+    report["approx_cv_train_cases_per_fold"] = (
+        int(effective_train_case_count * (num_folds - 1) / num_folds) if num_folds > 0 else 0
+    )
+    report["approx_cv_val_cases_per_fold"] = int(effective_train_case_count / num_folds) if num_folds > 0 else 0
+    report["subset_is_cv_compatible"] = bool(num_folds > 0 and effective_train_case_count >= num_folds)
+    report["subset_cv_warning"] = ""
+    if not report["subset_is_cv_compatible"]:
+        report["subset_cv_warning"] = (
+            "Effective train subset is smaller than the number of folds. "
+            "Increase train_case_limit or reduce the number of folds."
+        )
 
     if val_root is not None and val_root.exists():
         val_cases, val_duplicates, _, val_image_count, val_sample_images = _find_case_dirs(
@@ -186,6 +215,10 @@ def main() -> None:
             label_keyword=None,
         )
         report["val_case_count"] = len(val_cases)
+        report["effective_val_case_count"] = min(
+            len(val_cases),
+            int(cfg.get("val_case_limit", 0) or 0) if int(cfg.get("val_case_limit", 0) or 0) > 0 else len(val_cases),
+        )
         report["val_image_match_count"] = val_image_count
         report["val_sample_images"] = val_sample_images
         report["val_duplicate_case_ids"] = val_duplicates
@@ -195,6 +228,7 @@ def main() -> None:
         report["val_sample_files"] = _sample_files(val_root)
     else:
         report["val_case_count"] = 0
+        report["effective_val_case_count"] = 0
         report["val_image_match_count"] = 0
         report["val_sample_images"] = []
         report["val_duplicate_case_ids"] = {}

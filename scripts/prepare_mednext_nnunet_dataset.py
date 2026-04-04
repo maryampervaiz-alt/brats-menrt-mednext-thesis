@@ -3,8 +3,16 @@ from __future__ import annotations
 import argparse
 import gzip
 import json
+import random
 import shutil
 from pathlib import Path
+from typing import TypeVar
+
+import numpy as np
+import SimpleITK as sitk
+
+
+T = TypeVar("T")
 
 
 def parse_args() -> argparse.Namespace:
@@ -19,6 +27,24 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--copy-mode", type=str, default="copy", choices=["copy", "hardlink"])
     p.add_argument("--trainer-name", type=str, default="nnUNetTrainerV2_MedNeXt_S_kernel3")
     p.add_argument("--plans-identifier", type=str, default="nnUNetPlansv2.1_trgSp_1x1x1")
+    p.add_argument("--train-case-limit", type=int, default=0, help="Use only the first deterministic subset of train cases")
+    p.add_argument("--val-case-limit", type=int, default=0, help="Use only the first deterministic subset of val/test cases")
+    p.add_argument("--subset-seed", type=int, default=42, help="Deterministic seed for subset selection")
+    p.add_argument(
+        "--train-subset-strategy",
+        type=str,
+        default="stratified_label_volume",
+        choices=["random", "stratified_label_volume"],
+        help="Train subset selection strategy.",
+    )
+    p.add_argument(
+        "--val-subset-strategy",
+        type=str,
+        default="random",
+        choices=["random"],
+        help="Val/test subset selection strategy.",
+    )
+    p.add_argument("--stratify-volume-bins", type=int, default=5, help="Number of quantile bins for label-volume stratification")
     p.add_argument("--clean-output", action="store_true")
     return p.parse_args()
 
@@ -205,6 +231,125 @@ def _write_command_sheet(task_dir: Path, task_id: int, task_name: str, trainer_n
     cmd_txt.write_text("\n".join(lines), encoding="utf-8")
 
 
+def _select_subset(cases: list[T], limit: int, seed: int, seed_offset: int = 0) -> list[T]:
+    if limit <= 0 or limit >= len(cases):
+        return list(cases)
+    rng = random.Random(seed + seed_offset)
+    selected_indices = sorted(rng.sample(range(len(cases)), k=limit))
+    return [cases[i] for i in selected_indices]
+
+
+def _foreground_voxel_count(label_path: Path) -> int:
+    img = sitk.ReadImage(str(label_path))
+    arr = sitk.GetArrayViewFromImage(img)
+    return int(np.count_nonzero(arr))
+
+
+def _assign_volume_strata(
+    training_cases: list[tuple[str, Path, Path]],
+    num_bins: int,
+) -> dict[str, dict[str, int]]:
+    if num_bins <= 1 or len(training_cases) <= 1:
+        return {
+            case_id: {"foreground_voxels": _foreground_voxel_count(lbl), "stratum_id": 0}
+            for case_id, _, lbl in training_cases
+        }
+
+    scored_cases = []
+    for case_id, _, lbl in training_cases:
+        scored_cases.append((case_id, _foreground_voxel_count(lbl)))
+
+    scored_cases.sort(key=lambda x: (x[1], x[0]))
+    strata: dict[str, dict[str, int]] = {}
+    total = len(scored_cases)
+    for idx, (case_id, voxels) in enumerate(scored_cases):
+        stratum_id = min(num_bins - 1, int(idx * num_bins / total))
+        strata[case_id] = {"foreground_voxels": int(voxels), "stratum_id": int(stratum_id)}
+    return strata
+
+
+def _select_subset_stratified(
+    training_cases: list[tuple[str, Path, Path]],
+    limit: int,
+    seed: int,
+    strata: dict[str, dict[str, int]],
+) -> list[tuple[str, Path, Path]]:
+    if limit <= 0 or limit >= len(training_cases):
+        return list(training_cases)
+
+    bins: dict[int, list[tuple[str, Path, Path]]] = {}
+    for case in training_cases:
+        case_id = case[0]
+        stratum_id = int(strata[case_id]["stratum_id"])
+        bins.setdefault(stratum_id, []).append(case)
+
+    rng = random.Random(seed)
+    for stratum_id in bins:
+        bins[stratum_id] = sorted(bins[stratum_id], key=lambda x: x[0])
+        rng.shuffle(bins[stratum_id])
+
+    total_cases = len(training_cases)
+    allocations: dict[int, int] = {}
+    remainders: list[tuple[float, int]] = []
+    for stratum_id, cases_in_bin in bins.items():
+        exact = limit * len(cases_in_bin) / total_cases
+        alloc = min(len(cases_in_bin), int(exact))
+        allocations[stratum_id] = alloc
+        remainders.append((exact - alloc, stratum_id))
+
+    remaining = limit - sum(allocations.values())
+    for _, stratum_id in sorted(remainders, key=lambda x: (-x[0], x[1])):
+        if remaining <= 0:
+            break
+        if allocations[stratum_id] < len(bins[stratum_id]):
+            allocations[stratum_id] += 1
+            remaining -= 1
+
+    selected: list[tuple[str, Path, Path]] = []
+    for stratum_id in sorted(bins):
+        selected.extend(bins[stratum_id][: allocations[stratum_id]])
+    return sorted(selected, key=lambda x: x[0])
+
+
+def _write_subset_manifest(
+    path: Path,
+    train_cases_all: list[tuple[str, Path, Path]],
+    train_cases_selected: list[tuple[str, Path, Path]],
+    test_cases_all: list[tuple[str, Path]],
+    test_cases_selected: list[tuple[str, Path]],
+    train_case_limit: int,
+    val_case_limit: int,
+    subset_seed: int,
+    train_subset_strategy: str,
+    val_subset_strategy: str,
+    stratify_volume_bins: int,
+    train_case_metadata: dict[str, dict[str, int]],
+) -> None:
+    payload = {
+        "subset_seed": int(subset_seed),
+        "train_case_limit": int(train_case_limit),
+        "val_case_limit": int(val_case_limit),
+        "train_subset_strategy": str(train_subset_strategy),
+        "val_subset_strategy": str(val_subset_strategy),
+        "stratify_volume_bins": int(stratify_volume_bins),
+        "full_train_case_count": int(len(train_cases_all)),
+        "selected_train_case_count": int(len(train_cases_selected)),
+        "full_val_case_count": int(len(test_cases_all)),
+        "selected_val_case_count": int(len(test_cases_selected)),
+        "selected_train_case_ids": [case_id for case_id, _, _ in train_cases_selected],
+        "selected_val_case_ids": [case_id for case_id, _ in test_cases_selected],
+        "selected_train_cases": [
+            {
+                "case_id": case_id,
+                "foreground_voxels": int(train_case_metadata.get(case_id, {}).get("foreground_voxels", -1)),
+                "stratum_id": int(train_case_metadata.get(case_id, {}).get("stratum_id", -1)),
+            }
+            for case_id, _, _ in train_cases_selected
+        ],
+    }
+    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
 def main() -> None:
     args = parse_args()
     train_root = Path(args.train_root)
@@ -222,9 +367,31 @@ def main() -> None:
         _clear_dir(labels_tr)
         _clear_dir(images_ts)
 
-    training_cases = _collect_labeled_cases(train_root, args.image_keyword, args.label_keyword)
-    if not training_cases:
+    training_cases_all = _collect_labeled_cases(train_root, args.image_keyword, args.label_keyword)
+    if not training_cases_all:
         raise RuntimeError("No labeled cases found. Check train root and keywords.")
+    train_case_metadata = _assign_volume_strata(training_cases_all, args.stratify_volume_bins)
+    if args.train_subset_strategy == "stratified_label_volume":
+        training_cases = _select_subset_stratified(
+            training_cases_all,
+            args.train_case_limit,
+            args.subset_seed,
+            train_case_metadata,
+        )
+    else:
+        training_cases = _select_subset(training_cases_all, args.train_case_limit, args.subset_seed, seed_offset=0)
+    if len(training_cases) != len(training_cases_all):
+        print(
+            f"Using train subset: {len(training_cases)}/{len(training_cases_all)} cases "
+            f"(strategy={args.train_subset_strategy}, seed={args.subset_seed})",
+            flush=True,
+        )
+    else:
+        print(
+            f"Using full train set: {len(training_cases)} cases "
+            f"(strategy={args.train_subset_strategy})",
+            flush=True,
+        )
 
     unique_case_ids = {case_id for case_id, _, _ in training_cases}
     total_train = len(training_cases)
@@ -233,9 +400,26 @@ def main() -> None:
         _copy_or_link(lbl, labels_tr / f"{case_id}.nii.gz", args.copy_mode)
         _progress_every(idx, total_train, "train", case_id)
 
+    test_cases_all: list[tuple[str, Path]] = []
     test_cases: list[tuple[str, Path]] = []
     if val_root is not None and val_root.exists():
-        test_cases = _collect_unlabeled_cases(val_root, args.image_keyword)
+        test_cases_all = _collect_unlabeled_cases(val_root, args.image_keyword)
+        if args.val_subset_strategy == "random":
+            test_cases = _select_subset(test_cases_all, args.val_case_limit, args.subset_seed, seed_offset=100003)
+        else:
+            test_cases = _select_subset(test_cases_all, args.val_case_limit, args.subset_seed, seed_offset=100003)
+        if len(test_cases) != len(test_cases_all):
+            print(
+                f"Using val/test subset: {len(test_cases)}/{len(test_cases_all)} cases "
+                f"(strategy={args.val_subset_strategy}, seed={args.subset_seed})",
+                flush=True,
+            )
+        else:
+            print(
+                f"Using full val/test set: {len(test_cases)} cases "
+                f"(strategy={args.val_subset_strategy})",
+                flush=True,
+            )
         overlap = unique_case_ids.intersection({case_id for case_id, _ in test_cases})
         if overlap:
             raise RuntimeError(f"Detected overlap between train and val case IDs: {sorted(list(overlap))[:10]}")
@@ -251,6 +435,20 @@ def main() -> None:
         args.task_name,
         trainer_name=args.trainer_name,
         plans_identifier=args.plans_identifier,
+    )
+    _write_subset_manifest(
+        task_dir / "subset_manifest.json",
+        train_cases_all=training_cases_all,
+        train_cases_selected=training_cases,
+        test_cases_all=test_cases_all,
+        test_cases_selected=test_cases,
+        train_case_limit=args.train_case_limit,
+        val_case_limit=args.val_case_limit,
+        subset_seed=args.subset_seed,
+        train_subset_strategy=args.train_subset_strategy,
+        val_subset_strategy=args.val_subset_strategy,
+        stratify_volume_bins=args.stratify_volume_bins,
+        train_case_metadata=train_case_metadata,
     )
 
     print(f"Prepared official nnU-Net(v1) task at: {task_dir.resolve()}")

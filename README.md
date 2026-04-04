@@ -43,12 +43,16 @@ Current thesis-oriented defaults:
 - task name: `Task502_BraTSMENRT`
 - trainer family: `nnUNetTrainerV2_MedNeXt_S_kernel3`
 - custom wrapper trainer: `nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT`
+- deterministic smoke-test subset: `150` train cases + `20` image-only val/test cases
+- train subset strategy: `stratified_label_volume`
+- fold split strategy: stratified 5-fold CV using label-volume bins
 - initial warm-start: `20` epochs per fold
 - later full continuation: same fold, same trainer, higher epoch target
 
 ## Core Scripts
 
 - [prepare_mednext_nnunet_dataset.py](scripts/prepare_mednext_nnunet_dataset.py)
+- [create_mednext_stratified_splits.py](scripts/create_mednext_stratified_splits.py)
 - [install_mednext_custom_trainer.py](scripts/install_mednext_custom_trainer.py)
 - [run_mednext_nnunet.py](scripts/run_mednext_nnunet.py)
 - [validate_mednext_nnunet_setup.py](scripts/validate_mednext_nnunet_setup.py)
@@ -76,6 +80,18 @@ This creates:
 - `nnUNet_raw_data_base/nnUNet_raw_data/Task502_BraTSMENRT/labelsTr`
 - `nnUNet_raw_data_base/nnUNet_raw_data/Task502_BraTSMENRT/imagesTs`
 - `dataset.json`
+- `subset_manifest.json`
+
+The current config defaults intentionally use a deterministic subset for smoke testing:
+
+- `train_case_limit: 150`
+- `val_case_limit: 20`
+- `subset_seed: 42`
+- `train_subset_strategy: stratified_label_volume`
+- `stratify_volume_bins: 5`
+- `split_seed: 42`
+
+This allows you to validate the full pipeline, 5-fold orchestration, reporting, and SAM-Med3D prompt handoff before spending full-dataset compute.
 
 ### 2) Set official environment variables
 
@@ -135,6 +151,17 @@ This checks:
 - duplicate case IDs are detected early
 - train/val overlap is reported early
 - the configured official base trainer can be imported
+- the effective subset size is reported
+- approximate per-fold train/validation counts are reported
+- subset-vs-fold compatibility is reported early
+
+### 4.75) Generate stratified 5-fold CV splits
+
+```bash
+python scripts/create_mednext_stratified_splits.py --config configs/mednext_nnunet.yaml
+```
+
+This writes `splits_final.pkl` for nnU-Net(v1) and a JSON summary of the selected strata.
 
 ### 5) Initial warm-start for one fold
 
@@ -196,7 +223,9 @@ Recommended workflow:
 
 Pragmatic recommendation:
 
+- first run the deterministic subset smoke test (`150` train, `20` image-only val/test)
 - use `20` epochs first only to inspect coarse masks for SAM-Med3D prompting
+- once the pipeline is verified, set `train_case_limit: 0` and `val_case_limit: 0` for full-dataset experiments
 - for final thesis reporting, run the selected folds again with the full target budget
 
 This is the safest workflow for limited Kaggle time.
@@ -230,6 +259,17 @@ This writes real reports only after training artifacts exist:
 - export JSON summary
 
 The repo does not create fake metric files before training.
+
+## Reproducibility Artifacts
+
+Each runner invocation saves real environment metadata under:
+
+- `menrt_repo_artifacts/command_history.log`
+- `menrt_repo_artifacts/mednext_nnunet_config_snapshot.yaml`
+- `menrt_repo_artifacts/runtime_snapshot.json`
+- `menrt_repo_artifacts/pip_freeze.txt`
+- `menrt_repo_artifacts/git_head.txt`
+- `menrt_repo_artifacts/stratified_splits_summary.json`
 
 ## Thesis Framing
 

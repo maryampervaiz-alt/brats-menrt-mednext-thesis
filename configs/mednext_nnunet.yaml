@@ -6,6 +6,13 @@ mednext_nnunet:
 
   train_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-TrainingData
   val_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-ValidationData
+  train_case_limit: 150
+  val_case_limit: 20
+  subset_seed: 42
+  train_subset_strategy: stratified_label_volume
+  val_subset_strategy: random
+  stratify_volume_bins: 5
+  split_seed: 42
 
   nnunet_raw_data_base: /kaggle/working/nnUNet_raw_data_base
   nnunet_preprocessed: /kaggle/working/nnUNet_preprocessed
@@ -34,5 +41,6 @@ mednext_nnunet:
 
   run_prepare: true
   run_plan_and_preprocess: true
+  run_make_splits: true
   run_install_trainer: true
   run_train: true

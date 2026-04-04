@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -18,7 +20,7 @@ def parse_args() -> argparse.Namespace:
         "--mode",
         type=str,
         default="all",
-        choices=["all", "prepare", "preprocess", "install-trainer", "train", "predict"],
+        choices=["all", "prepare", "preprocess", "make-splits", "install-trainer", "train", "predict"],
     )
     p.add_argument("--fold", type=int, default=-1, help="Override config folds and run a single fold.")
     p.add_argument("--max-epochs", type=int, default=-1, help="Override configured max epochs.")
@@ -57,6 +59,50 @@ def _write_config_snapshot(cfg: dict, config_path: str, artifacts_dir: Path) -> 
     snapshot_path = artifacts_dir / "mednext_nnunet_config_snapshot.yaml"
     raw_cfg = yaml.safe_load(Path(config_path).read_text(encoding="utf-8"))
     snapshot_path.write_text(yaml.safe_dump(raw_cfg, sort_keys=False), encoding="utf-8")
+
+
+def _write_runtime_snapshot(env: dict[str, str], artifacts_dir: Path) -> None:
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    runtime_payload = {
+        "python_executable": sys.executable,
+        "python_version": sys.version,
+        "platform": platform.platform(),
+        "cwd": str(Path.cwd().resolve()),
+        "tracked_env": {
+            "nnUNet_raw_data_base": env.get("nnUNet_raw_data_base", ""),
+            "nnUNet_preprocessed": env.get("nnUNet_preprocessed", ""),
+            "RESULTS_FOLDER": env.get("RESULTS_FOLDER", ""),
+            "MEDNEXT_MAX_EPOCHS": env.get("MEDNEXT_MAX_EPOCHS", ""),
+        },
+    }
+    (artifacts_dir / "runtime_snapshot.json").write_text(
+        json.dumps(runtime_payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    try:
+        freeze = subprocess.run(
+            [sys.executable, "-m", "pip", "freeze"],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        (artifacts_dir / "pip_freeze.txt").write_text(freeze.stdout, encoding="utf-8")
+    except Exception as exc:
+        (artifacts_dir / "pip_freeze_error.txt").write_text(str(exc) + "\n", encoding="utf-8")
+
+    try:
+        git_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        (artifacts_dir / "git_head.txt").write_text(git_head.stdout, encoding="utf-8")
+    except Exception as exc:
+        (artifacts_dir / "git_head_error.txt").write_text(str(exc) + "\n", encoding="utf-8")
 
 
 def _run(cmd: list[str], env: dict[str, str], dry_run: bool, log_file: Path | None = None) -> None:
@@ -125,6 +171,20 @@ def _prepare(cfg: dict, env: dict[str, str], dry_run: bool, log_file: Path | Non
         "--plans-identifier",
         str(cfg["plans_identifier"]),
     ]
+    train_case_limit = int(cfg.get("train_case_limit", 0) or 0)
+    val_case_limit = int(cfg.get("val_case_limit", 0) or 0)
+    subset_seed = int(cfg.get("subset_seed", 42) or 42)
+    train_subset_strategy = str(cfg.get("train_subset_strategy", "stratified_label_volume"))
+    val_subset_strategy = str(cfg.get("val_subset_strategy", "random"))
+    stratify_volume_bins = int(cfg.get("stratify_volume_bins", 5) or 5)
+    if train_case_limit > 0:
+        cmd.extend(["--train-case-limit", str(train_case_limit)])
+    if val_case_limit > 0:
+        cmd.extend(["--val-case-limit", str(val_case_limit)])
+    cmd.extend(["--subset-seed", str(subset_seed)])
+    cmd.extend(["--train-subset-strategy", train_subset_strategy])
+    cmd.extend(["--val-subset-strategy", val_subset_strategy])
+    cmd.extend(["--stratify-volume-bins", str(stratify_volume_bins)])
     if bool(cfg.get("clean_task_output", True)):
         cmd.append("--clean-output")
     _run(cmd, env=env, dry_run=dry_run, log_file=log_file)
@@ -157,6 +217,22 @@ def _install_trainer(cfg: dict, env: dict[str, str], dry_run: bool, log_file: Pa
         str(cfg["trainer_epochs_env"]),
         "--default-epochs",
         str(cfg["max_epochs"]),
+    ]
+    _run(cmd, env=env, dry_run=dry_run, log_file=log_file)
+
+
+def _make_splits(
+    cfg: dict,
+    config_path: str,
+    env: dict[str, str],
+    dry_run: bool,
+    log_file: Path | None = None,
+) -> None:
+    cmd = [
+        sys.executable,
+        "scripts/create_mednext_stratified_splits.py",
+        "--config",
+        str(config_path),
     ]
     _run(cmd, env=env, dry_run=dry_run, log_file=log_file)
 
@@ -235,11 +311,14 @@ def main() -> None:
     artifacts_dir = Path(".dryrun_artifacts") if args.dry_run else _artifacts_dir(cfg)
     log_file = artifacts_dir / "command_history.log"
     _write_config_snapshot(cfg, args.config, artifacts_dir)
+    _write_runtime_snapshot(env, artifacts_dir)
 
     if args.mode in ("all", "prepare") and bool(cfg.get("run_prepare", True)):
         _prepare(cfg, env=env, dry_run=args.dry_run, log_file=log_file)
     if args.mode in ("all", "preprocess") and bool(cfg.get("run_plan_and_preprocess", True)):
         _preprocess(cfg, env=env, dry_run=args.dry_run, log_file=log_file)
+    if args.mode in ("all", "make-splits") and bool(cfg.get("run_make_splits", True)):
+        _make_splits(cfg, args.config, env=env, dry_run=args.dry_run, log_file=log_file)
     if args.mode in ("all", "install-trainer") and bool(cfg.get("run_install_trainer", True)):
         _install_trainer(cfg, env=env, dry_run=args.dry_run, log_file=log_file)
     if args.mode in ("all", "train") and bool(cfg.get("run_train", True)):

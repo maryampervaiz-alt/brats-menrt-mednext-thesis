@@ -7,30 +7,36 @@
    Training framework: official MedNeXt nnU-Net(v1)-based pipeline
 2. Prepare MEN-RT in old nnU-Net task format with `scripts/prepare_mednext_nnunet_dataset.py`.
 3. Run official preprocessing with `mednextv1_plan_and_preprocess`.
-4. Train using official MedNeXt trainer family (`nnUNetTrainerV2_MedNeXt_*`).
-5. Validate CLI, case discovery, duplicate IDs, and trainer import with `scripts/validate_mednext_nnunet_setup.py`.
+4. Generate stratified `splits_final.pkl` with `scripts/create_mednext_stratified_splits.py`.
+5. Train using official MedNeXt trainer family (`nnUNetTrainerV2_MedNeXt_*`).
+6. Validate CLI, case discovery, duplicate IDs, and trainer import with `scripts/validate_mednext_nnunet_setup.py`.
+7. Run the deterministic subset smoke test first (`train_case_limit: 150`, `val_case_limit: 20`) before any full-dataset run.
 
 ## Initial Warm-Start
 
 1. Train one fold at a time.
 2. Use `nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT`.
-3. Set `MEDNEXT_MAX_EPOCHS=20` for the first pass on each fold.
-4. Archive fold state after each session with `scripts/archive_mednext_state.py`.
-5. Save Kaggle version after each fold/session.
+3. For repository validation, first run the subset smoke test across folds.
+4. Set `MEDNEXT_MAX_EPOCHS=20` for the first pass on each fold.
+5. Use the stratified subset and stratified CV splits for the smoke test.
+6. Archive fold state after each session with `scripts/archive_mednext_state.py`.
+7. Save Kaggle version after each fold/session.
 
 ## Full Training Later
 
-1. Restore archived state if needed.
-2. Use `-c` to continue interrupted runs of the same target training.
-3. For final thesis reporting after a 20-epoch preview, prefer a fresh full run at the final target budget, for example `150`.
-4. Keep the same trainer family and plans identifier.
+1. After subset smoke-test success, set `train_case_limit: 0` and `val_case_limit: 0`.
+2. Restore archived state if needed.
+3. Use `-c` to continue interrupted runs of the same target training.
+4. For final thesis reporting after a 20-epoch preview, prefer a fresh full run at the final target budget, for example `150`.
+5. Keep the same trainer family and plans identifier.
 
 ## Output Use
 
 1. Use MedNeXt output as coarse segmentation.
 2. Feed coarse segmentation to SAM-Med3D for refinement.
 3. Keep fold-wise checkpoints and command logs.
-4. Export real fold and per-case CSV reports after training with `scripts/export_mednext_results.py`.
+4. Keep runtime metadata artifacts (`runtime_snapshot.json`, `pip_freeze.txt`, `git_head.txt`).
+5. Export real fold and per-case CSV reports after training with `scripts/export_mednext_results.py`.
 
 ## Defense Points
 
