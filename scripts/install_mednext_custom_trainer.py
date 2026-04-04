@@ -39,12 +39,20 @@ def _locate_trainer(base_trainer: str) -> tuple[str, Path]:
     raise RuntimeError(f"Could not find base trainer class: {base_trainer}")
 
 
+def _locate_nnunet_network_training_dir() -> Path | None:
+    try:
+        mod = importlib.import_module("nnunet.training.network_training")
+    except Exception:
+        return None
+    return Path(inspect.getfile(mod)).resolve().parent
+
+
 def main() -> None:
     args = parse_args()
     module_name, module_file = _locate_trainer(args.base_trainer)
-    out_file = module_file.parent / f"{args.new_trainer}.py"
+    mednext_out_file = module_file.parent / f"{args.new_trainer}.py"
 
-    code = f'''from __future__ import annotations
+    mednext_code = f'''from __future__ import annotations
 
 import os
 from {module_name} import {args.base_trainer}
@@ -67,9 +75,19 @@ class {args.new_trainer}({args.base_trainer}):
             self.num_epochs = max_epochs
         self.unpack_data = unpack_data
 '''
-    out_file.write_text(code, encoding="utf-8")
-    print(f"Installed trainer wrapper: {out_file}")
+    mednext_out_file.write_text(mednext_code, encoding="utf-8")
+    print(f"Installed trainer wrapper: {mednext_out_file}")
     print(f"Base trainer module: {module_name}")
+
+    bridge_dir = _locate_nnunet_network_training_dir()
+    if bridge_dir is not None:
+        bridge_out_file = bridge_dir / f"{args.new_trainer}.py"
+        bridge_code = f'''from __future__ import annotations
+
+from nnunet_mednext.training.network_training.MedNeXt.{args.new_trainer} import {args.new_trainer}
+'''
+        bridge_out_file.write_text(bridge_code, encoding="utf-8")
+        print(f"Installed nnUNet inference bridge: {bridge_out_file}")
 
 
 if __name__ == "__main__":
