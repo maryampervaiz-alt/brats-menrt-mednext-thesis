@@ -152,6 +152,9 @@ def _build_env(cfg: dict, max_epochs_override: int = -1) -> dict[str, str]:
     env[str(cfg.get("trainer_unpack_env", "MEDNEXT_UNPACK_DATA"))] = "1" if bool(cfg.get("unpack_preprocessed", False)) else "0"
     if bool(cfg.get("torch_force_no_weights_only_load", True)):
         env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
+    # Reduce GPU memory fragmentation — helps on 15 GB GPUs (Kaggle T4 / P100)
+    # where nnUNet's large tensor allocations fragment the allocator pool.
+    env["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
     return env
 
 
