@@ -6,7 +6,7 @@ mednext_nnunet:
 
   train_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-TrainingData
   val_root: /kaggle/input/brats-men-rt/BraTS2024-MEN-RT-ValidationData
-  train_case_limit: 150
+  train_case_limit: 50
   val_case_limit: 20
   subset_seed: 42
   train_subset_strategy: stratified_label_volume
@@ -27,8 +27,6 @@ mednext_nnunet:
   planner_2d: None
   network: 3d_fullres
   plans_identifier: nnUNetPlansv2.1_trgSp_1x1x1
-  train_patch_size_override: [96, 96, 96]
-  train_batch_size_override: 1
 
   predict_input: ""
   predict_output: /kaggle/working/mednext_predictions
@@ -39,14 +37,13 @@ mednext_nnunet:
   trainer_unpack_env: MEDNEXT_UNPACK_DATA
   unpack_preprocessed: false
   torch_force_no_weights_only_load: true
-  max_epochs: 20
+  max_epochs: 30
   continue_training: false
 
   folds: [0, 1, 2, 3, 4]
 
   run_prepare: true
   run_plan_and_preprocess: true
-  run_patch_plans: true
   run_make_splits: true
   run_install_trainer: true
   run_train: true

@@ -43,10 +43,10 @@ Current thesis-oriented defaults:
 - task name: `Task502_BraTSMENRT`
 - trainer family: `nnUNetTrainerV2_MedNeXt_S_kernel3`
 - custom wrapper trainer: `nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT`
-- deterministic smoke-test subset: `150` train cases + `20` image-only val/test cases
+- deterministic smoke-test subset: `50` train cases + `20` image-only val/test cases
 - train subset strategy: `stratified_label_volume`
 - fold split strategy: stratified 5-fold CV using label-volume bins
-- initial warm-start: `20` epochs per fold
+- Kaggle subset target: `30` epochs per fold
 - later full continuation: same fold, same trainer, higher epoch target
 
 ## Core Scripts
@@ -84,7 +84,7 @@ This creates:
 
 The current config defaults intentionally use a deterministic subset for smoke testing:
 
-- `train_case_limit: 150`
+- `train_case_limit: 50`
 - `val_case_limit: 20`
 - `subset_seed: 42`
 - `train_subset_strategy: stratified_label_volume`
@@ -120,19 +120,6 @@ This follows the official MedNeXt planner strategy:
 - `1mm` isotropic spacing
 - `128x128x128` planner target conditions used by the official MedNeXt internal pipeline
 
-### 3.5) Patch training plans for Kaggle-safe smoke tests
-
-```bash
-python scripts/patch_mednext_training_plans.py --config configs/mednext_nnunet.yaml
-```
-
-Current smoke-test defaults patch the training plans to:
-
-- `patch_size: [96, 96, 96]`
-- `batch_size: 1`
-
-This is applied after preprocessing, so you do not need to rerun preprocessing to reduce GPU memory use.
-
 ### 4) Install thin MEN-RT trainer wrapper
 
 ```bash
@@ -140,14 +127,14 @@ python scripts/install_mednext_custom_trainer.py \
   --base-trainer nnUNetTrainerV2_MedNeXt_S_kernel3 \
   --new-trainer nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT \
   --epochs-env MEDNEXT_MAX_EPOCHS \
-  --default-epochs 20
+  --default-epochs 30
 ```
 
 Purpose:
 
 - keep the official MedNeXt trainer family
 - keep the same trainer/output path across sessions
-- allow first-pass `20` epochs and later continuation to `150` or any higher target
+- allow the Kaggle subset target of `30` epochs and later continuation to any higher target
 
 ### 4.5) Validate setup before launching training
 
@@ -176,10 +163,10 @@ python scripts/create_mednext_stratified_splits.py --config configs/mednext_nnun
 
 This writes `splits_final.pkl` for nnU-Net(v1) and a JSON summary of the selected strata.
 
-### 5) Initial warm-start for one fold
+### 5) Train one fold for the Kaggle subset target
 
 ```bash
-MEDNEXT_MAX_EPOCHS=20 \
+MEDNEXT_MAX_EPOCHS=30 \
 mednextv1_train 3d_fullres nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT Task502_BraTSMENRT 0 -p nnUNetPlansv2.1_trgSp_1x1x1
 ```
 
@@ -195,14 +182,14 @@ Because the trainer name stays the same, continuation remains in the same result
 Important:
 
 - if a run is **interrupted** and you want to finish the same target training, `-c` is the correct resume path
-- if you only ran a **20-epoch preview** and later want thesis-grade final numbers at `150` epochs, the cleaner option is to launch a fresh full run for that fold
+- if you only ran the subset-50 Kaggle workflow and later want thesis-grade final numbers on the full dataset, the cleaner option is to launch a fresh full run for that fold on stronger hardware
 
 ## One-command Runner
 
 Wrapper command for this repo:
 
 ```bash
-python scripts/run_mednext_nnunet.py --config configs/mednext_nnunet.yaml --mode all --fold 0 --max-epochs 20
+python scripts/run_mednext_nnunet.py --config configs/mednext_nnunet.yaml --mode all --fold 0 --max-epochs 30
 ```
 
 Continue later:
@@ -229,15 +216,16 @@ Recommended workflow:
 2. Preprocess once.
 3. Install trainer wrapper once.
 4. Train **one fold at a time**.
-5. Start each fold with `20` epochs.
-6. Inspect coarse segmentation behavior for SAM-Med3D prompting.
-7. Archive fold state.
-8. Resume interrupted runs with `-c`.
+5. Target `30` epochs per fold on the `50`-case subset.
+6. Leave the nnU-Net auto-generated patch size and batch size untouched.
+7. Inspect coarse segmentation behavior for SAM-Med3D prompting.
+8. Archive fold state.
+9. Resume interrupted runs with `-c`.
 
 Pragmatic recommendation:
 
-- first run the deterministic subset smoke test (`150` train, `20` image-only val/test)
-- use `20` epochs first only to inspect coarse masks for SAM-Med3D prompting
+- first run the deterministic subset smoke test (`50` train, `20` image-only val/test)
+- use this subset to verify that all `5` folds can launch and complete `30` epochs on Kaggle
 - once the pipeline is verified, set `train_case_limit: 0` and `val_case_limit: 0` for full-dataset experiments
 - for final thesis reporting, run the selected folds again with the full target budget
 

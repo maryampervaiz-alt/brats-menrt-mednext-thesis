@@ -69,10 +69,10 @@ class {args.new_trainer}({args.base_trainer}):
         super().__init__(*args, **kwargs)
         max_epochs = int(os.environ.get("{args.epochs_env}", "{args.default_epochs}"))
         unpack_data = bool(int(os.environ.get("{args.unpack_env}", "{args.default_unpack}")))
+        # max_num_epochs is the nnU-Net v1 attribute used by MedNeXt trainers.
+        # num_epochs belongs to nnU-Net v2 and will never exist here.
         if hasattr(self, "max_num_epochs"):
             self.max_num_epochs = max_epochs
-        if hasattr(self, "num_epochs"):
-            self.num_epochs = max_epochs
         self.unpack_data = unpack_data
 '''
     mednext_out_file.write_text(mednext_code, encoding="utf-8")
@@ -82,12 +82,18 @@ class {args.new_trainer}({args.base_trainer}):
     bridge_dir = _locate_nnunet_network_training_dir()
     if bridge_dir is not None:
         bridge_out_file = bridge_dir / f"{args.new_trainer}.py"
+        # Derive the new trainer's module path from the dynamically discovered base
+        # trainer module, not a hardcoded assumption about package structure.
+        # module_name is e.g. "nnunet_mednext.training.network_training.MedNeXt.nnUNetTrainerV2_MedNeXt_S_kernel3"
+        parent_module = module_name.rsplit(".", 1)[0]
+        new_trainer_module = f"{parent_module}.{args.new_trainer}"
         bridge_code = f'''from __future__ import annotations
 
-from nnunet_mednext.training.network_training.MedNeXt.{args.new_trainer} import {args.new_trainer}
+from {new_trainer_module} import {args.new_trainer}
 '''
         bridge_out_file.write_text(bridge_code, encoding="utf-8")
         print(f"Installed nnUNet inference bridge: {bridge_out_file}")
+        print(f"Bridge imports from: {new_trainer_module}")
 
 
 if __name__ == "__main__":

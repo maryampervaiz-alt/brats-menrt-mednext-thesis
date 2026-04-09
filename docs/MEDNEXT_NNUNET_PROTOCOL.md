@@ -37,7 +37,7 @@ python scripts/prepare_mednext_nnunet_dataset.py \
 
 Current config defaults are intentionally smoke-test oriented:
 
-- `train_case_limit: 150`
+- `train_case_limit: 50`
 - `val_case_limit: 20`
 - `subset_seed: 42`
 - `train_subset_strategy: stratified_label_volume`
@@ -68,17 +68,6 @@ $env:RESULTS_FOLDER="C:\path\to\nnUNet_results"
 mednextv1_plan_and_preprocess -t 502 -pl3d ExperimentPlanner3D_v21_customTargetSpacing_1x1x1 -pl2d None
 ```
 
-### 3.5) Patch training plans for Kaggle-safe smoke tests
-
-```bash
-python scripts/patch_mednext_training_plans.py --config configs/mednext_nnunet.yaml
-```
-
-Current smoke-test defaults patch the training plans to:
-
-- `patch_size: [96, 96, 96]`
-- `batch_size: 1`
-
 ### 4) Install thin MEN-RT trainer wrapper
 
 ```bash
@@ -86,7 +75,7 @@ python scripts/install_mednext_custom_trainer.py \
   --base-trainer nnUNetTrainerV2_MedNeXt_S_kernel3 \
   --new-trainer nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT \
   --epochs-env MEDNEXT_MAX_EPOCHS \
-  --default-epochs 20
+  --default-epochs 30
 ```
 
 ### 4.5) Validate setup before training
@@ -110,10 +99,10 @@ python scripts/create_mednext_stratified_splits.py --config configs/mednext_nnun
 
 This writes `splits_final.pkl` for nnU-Net(v1) and a JSON summary of case strata.
 
-### 5) Train one fold for initial 20-epoch warm-start
+### 5) Train one fold for the subset-50 Kaggle target
 
 ```bash
-MEDNEXT_MAX_EPOCHS=20 \
+MEDNEXT_MAX_EPOCHS=30 \
 mednextv1_train 3d_fullres nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT Task502_BraTSMENRT 0 -p nnUNetPlansv2.1_trgSp_1x1x1
 ```
 
@@ -146,11 +135,12 @@ Recommended:
 1. First validate the repository on the deterministic subset smoke test.
 2. Prepare + preprocess once.
 3. Train one fold at a time.
-4. Start each fold with `MEDNEXT_MAX_EPOCHS=20`.
-5. Inspect coarse segmentation quality for SAM-Med3D prompting.
-6. Archive fold state after each session.
-7. Resume later with a higher `MEDNEXT_MAX_EPOCHS` and `-c`.
-8. Only after smoke-test success, switch `train_case_limit: 0` and `val_case_limit: 0` for full-dataset runs.
+4. Target `MEDNEXT_MAX_EPOCHS=30` on the `50`-case subset.
+5. Leave the nnU-Net auto-generated patch size and batch size untouched.
+6. Inspect coarse segmentation quality for SAM-Med3D prompting.
+7. Archive fold state after each session.
+8. Resume later with a higher `MEDNEXT_MAX_EPOCHS` and `-c`.
+9. Only after smoke-test success, switch `train_case_limit: 0` and `val_case_limit: 0` for full-dataset runs.
 
 ## Archive / Restore
 

@@ -415,10 +415,7 @@ def main() -> None:
     if val_root is not None and val_root.exists():
         test_cases_all = _collect_unlabeled_cases(val_root, args.image_keyword)
         print(f"Discovered image-only val/test cases: {len(test_cases_all)}", flush=True)
-        if args.val_subset_strategy == "random":
-            test_cases = _select_subset(test_cases_all, args.val_case_limit, args.subset_seed, seed_offset=100003)
-        else:
-            test_cases = _select_subset(test_cases_all, args.val_case_limit, args.subset_seed, seed_offset=100003)
+        test_cases = _select_subset(test_cases_all, args.val_case_limit, args.subset_seed, seed_offset=100003)
         if len(test_cases) != len(test_cases_all):
             print(
                 f"Using val/test subset: {len(test_cases)}/{len(test_cases_all)} cases "
