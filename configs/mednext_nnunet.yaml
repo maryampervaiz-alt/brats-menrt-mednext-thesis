@@ -31,8 +31,8 @@ mednext_nnunet:
   predict_input: ""
   predict_output: /kaggle/working/mednext_predictions
 
-  base_trainer: nnUNetTrainerV2_MedNeXt_S_kernel1
-  trainer_name: nnUNetTrainerV2_MedNeXt_S_kernel1_MENRT
+  base_trainer: nnUNetTrainerV2_MedNeXt_S_kernel3
+  trainer_name: nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT
   trainer_epochs_env: MEDNEXT_MAX_EPOCHS
   trainer_unpack_env: MEDNEXT_UNPACK_DATA
   unpack_preprocessed: false
