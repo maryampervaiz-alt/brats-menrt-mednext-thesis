@@ -1,0 +1,63 @@
+nnunet_baseline:
+  name: nnunet_baseline_v1
+
+  task_id: 503
+  task_name: Task503_BraTSMENRT_Baseline
+
+  # ── Dataset roots (Kaggle input paths) ─────────────────────────────────
+  train_root: /kaggle/input/datasets/maryampervaiz24029/brats-men-rt/BraTS2024-MEN-RT-TrainingData/BraTS-MEN-RT-Train-v2
+
+  # ── Subset selection ────────────────────────────────────────────────────
+  # 50 cases for 5-fold CV training.
+  # 10 additional cases held out from the labeled training pool as a
+  # fully independent test set (never seen during training or CV).
+  train_case_limit: 50
+  holdout_test_limit: 10
+  subset_seed: 42
+  train_subset_strategy: stratified_label_volume   # stratify by GTV volume
+  stratify_volume_bins: 5
+  split_seed: 42
+
+  # ── nnUNet working directories ──────────────────────────────────────────
+  nnunet_raw_data_base: /kaggle/working/nnUNet_raw_data_base
+  nnunet_preprocessed: /kaggle/working/nnUNet_preprocessed
+  results_folder: /kaggle/working/nnUNet_results
+
+  # ── Image / label file suffixes ─────────────────────────────────────────
+  image_keyword: _t1c.nii.gz
+  label_keyword: _gtv.nii.gz
+  copy_mode: copy          # "copy" or "hardlink"
+  clean_task_output: true  # wipe imagesTr / labelsTr / imagesTs before copying
+
+  # ── nnUNet planner — use DEFAULT (no custom spacing override) ───────────
+  # nnUNet auto-configures patch_size and batch_size from the data.
+  # DO NOT change these values.
+  planner_3d: ExperimentPlanner3D_v21
+  planner_2d: None
+  network: 3d_fullres
+  plans_identifier: nnUNetPlansv2.1
+
+  # ── Trainer ─────────────────────────────────────────────────────────────
+  # nnUNetTrainerV2_MENRT is a thin subclass of nnUNetTrainerV2 that reads
+  # max epochs from the NNUNET_MAX_EPOCHS environment variable, allowing
+  # per-fold epoch control without editing installed source files.
+  base_trainer: nnUNetTrainerV2
+  trainer_name: nnUNetTrainerV2_MENRT
+  trainer_epochs_env: NNUNET_MAX_EPOCHS
+  max_epochs: 50
+
+  # ── Inference output folders ─────────────────────────────────────────────
+  # raw       = predictions before nnUNet postprocessing
+  # postproc  = predictions after nnUNet postprocessing
+  predict_output_raw:     /kaggle/working/nnunet_predictions/raw
+  predict_output_postproc: /kaggle/working/nnunet_predictions/postprocessed
+
+  # ── Cross-validation folds ───────────────────────────────────────────────
+  folds: [0, 1, 2, 3, 4]
+
+  # ── Pipeline stage flags (set false to skip a stage in --mode all) ───────
+  run_prepare:             true
+  run_plan_and_preprocess: true
+  run_make_splits:         true
+  run_install_trainer:     true
+  run_train:               true
