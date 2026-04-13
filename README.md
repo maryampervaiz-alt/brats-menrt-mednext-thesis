@@ -1,289 +1,221 @@
-# BraTS MEN-RT MedNeXt Thesis Pipeline
+# BraTS 2024 MEN-RT — nnUNet Baseline for Meningioma GTV Segmentation
 
-This repository now keeps one training workflow only:
+**Thesis project:** Automatic GTV (Gross Tumour Volume) segmentation of meningiomas  
+from T1c MRI using nnUNet, with a two-stage pipeline that feeds predictions  
+as prompts into a foundation model (SAM/MedSAM) for refinement.
 
-- Architecture: **official MIC-DKFZ MedNeXt**
-- Training framework: **official MedNeXt internal nnU-Net(v1)-based pipeline**
-- Input: **3D T1c MRI**
-- Target: **binary GTV segmentation**
+---
 
-The old custom MONAI/PyTorch track has been removed from the main repo surface.
+## Project Overview
 
-## Why this repo is structured this way
+| Item | Detail |
+|------|--------|
+| Dataset | BraTS 2024 MEN-RT (500 training, 70 validation) |
+| Modality | T1c MRI (single channel) |
+| Task | Binary GTV segmentation |
+| Framework | nnUNet v1 (self-configuring) |
+| Smoke-test subset | 50 training + 10 held-out test cases |
+| Cross-validation | Stratified 5-fold (by GTV volume) |
+| Epochs | 50 per fold |
 
-The official MedNeXt repository states that its internal training framework is built on top of **nnU-Net(v1)**. This repository follows that official path instead of maintaining a separate custom training loop.
+---
 
-That means:
+## Repository Structure
 
-- preprocessing is done with `mednextv1_plan_and_preprocess`
-- training is done with `mednextv1_train`
-- trainer family is the official `nnUNetTrainerV2_MedNeXt_*`
+```
+.
+├── configs/
+│   ├── nnunet_baseline.yaml          ← Active config (nnUNet baseline)
+│   └── mednext_nnunet.yaml           ← Archive (MedNeXt — OOM on Kaggle T4)
+│
+├── scripts/
+│   │
+│   │  ── nnUNet baseline pipeline ──────────────────────────────────────
+│   ├── run_nnunet.py                 ← Main orchestrator (all modes)
+│   ├── prepare_nnunet_dataset.py     ← Stratified subset + nnUNet format
+│   ├── create_nnunet_splits.py       ← Stratified 5-fold CV splits
+│   ├── install_nnunet_trainer.py     ← Install nnUNetTrainerV2_MENRT
+│   ├── evaluate_nnunet_testset.py    ← Held-out test metrics (raw vs postproc)
+│   ├── plot_nnunet_results.py        ← Publication-ready figures
+│   │
+│   │  ── MedNeXt pipeline (archived) ──────────────────────────────────
+│   ├── run_mednext_nnunet.py
+│   ├── prepare_mednext_nnunet_dataset.py
+│   ├── create_mednext_stratified_splits.py
+│   ├── install_mednext_custom_trainer.py
+│   ├── export_mednext_results.py
+│   ├── plot_results.py
+│   ├── visualize_predictions.py
+│   └── mednext_to_prompts.py
+│
+├── kaggle_nnunet_baseline.ipynb      ← Kaggle notebook (active)
+├── kaggle_smoke_test.ipynb           ← Kaggle notebook (MedNeXt, archived)
+├── dataset_summary.json              ← Dataset statistics
+└── requirements.txt
+```
 
-## Install
+---
+
+## Quick Start (Kaggle)
+
+1. Open `kaggle_nnunet_baseline.ipynb` in Kaggle
+2. Add Data → attach BraTS-MEN-RT dataset
+3. Enable Internet and GPU T4
+4. Run cells top to bottom
+
+---
+
+## Quick Start (Local / Lab GPU)
 
 ```bash
+# Install dependencies
 pip install -r requirements.txt
-```
 
-This installs:
-
-- official MedNeXt package
-- explicit `nnunet==1.7.1` plus official MedNeXt console scripts such as `mednextv1_predict`
-
-## Main Config
-
-Use:
-
-```bash
-configs/mednext_nnunet.yaml
-```
-
-Current thesis-oriented defaults:
-
-- task name: `Task502_BraTSMENRT`
-- trainer family: `nnUNetTrainerV2_MedNeXt_S_kernel3`
-- custom wrapper trainer: `nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT`
-- deterministic smoke-test subset: `50` train cases + `20` image-only val/test cases
-- train subset strategy: `stratified_label_volume`
-- fold split strategy: stratified 5-fold CV using label-volume bins
-- Kaggle subset target: `30` epochs per fold
-- later full continuation: same fold, same trainer, higher epoch target
-
-## Core Scripts
-
-- [prepare_mednext_nnunet_dataset.py](scripts/prepare_mednext_nnunet_dataset.py)
-- [create_mednext_stratified_splits.py](scripts/create_mednext_stratified_splits.py)
-- [install_mednext_custom_trainer.py](scripts/install_mednext_custom_trainer.py)
-- [run_mednext_nnunet.py](scripts/run_mednext_nnunet.py)
-- [validate_mednext_nnunet_setup.py](scripts/validate_mednext_nnunet_setup.py)
-- [export_mednext_results.py](scripts/export_mednext_results.py)
-- [archive_mednext_state.py](scripts/archive_mednext_state.py)
-- [restore_mednext_state.py](scripts/restore_mednext_state.py)
-
-## Official Workflow
-
-### 1) Prepare MEN-RT in old nnU-Net(v1) task format
-
-```bash
-python scripts/prepare_mednext_nnunet_dataset.py \
-  --train-root /path/to/BraTS2024-MEN-RT-TrainingData \
-  --val-root /path/to/BraTS2024-MEN-RT-ValidationData \
-  --nnunet-raw-data-base /path/to/nnUNet_raw_data_base \
-  --task-id 502 \
-  --task-name Task502_BraTSMENRT \
-  --clean-output
-```
-
-This creates:
-
-- `nnUNet_raw_data_base/nnUNet_raw_data/Task502_BraTSMENRT/imagesTr`
-- `nnUNet_raw_data_base/nnUNet_raw_data/Task502_BraTSMENRT/labelsTr`
-- `nnUNet_raw_data_base/nnUNet_raw_data/Task502_BraTSMENRT/imagesTs`
-- `dataset.json`
-- `subset_manifest.json`
-
-The current config defaults intentionally use a deterministic subset for smoke testing:
-
-- `train_case_limit: 50`
-- `val_case_limit: 20`
-- `subset_seed: 42`
-- `train_subset_strategy: stratified_label_volume`
-- `stratify_volume_bins: 5`
-- `split_seed: 42`
-
-This allows you to validate the full pipeline, 5-fold orchestration, reporting, and SAM-Med3D prompt handoff before spending full-dataset compute.
-
-### 2) Set official environment variables
-
-```bash
+# Set environment variables
 export nnUNet_raw_data_base=/path/to/nnUNet_raw_data_base
 export nnUNet_preprocessed=/path/to/nnUNet_preprocessed
 export RESULTS_FOLDER=/path/to/nnUNet_results
+export NNUNET_MAX_EPOCHS=50
+
+# Run full pipeline
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode all
+
+# Or step by step:
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode prepare
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode preprocess
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode make-splits
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode install-trainer
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode train --fold 0
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode predict-testset
+python scripts/run_nnunet.py --config configs/nnunet_baseline.yaml --mode evaluate-testset
+
+# Generate plots
+python scripts/plot_nnunet_results.py --config configs/nnunet_baseline.yaml --dpi 300
 ```
 
-PowerShell:
+---
 
-```powershell
-$env:nnUNet_raw_data_base="C:\path\to\nnUNet_raw_data_base"
-$env:nnUNet_preprocessed="C:\path\to\nnUNet_preprocessed"
-$env:RESULTS_FOLDER="C:\path\to\nnUNet_results"
+## Pipeline Stages
+
+### Stage 1 — Dataset Preparation
+`prepare_nnunet_dataset.py`
+
+- Scans all 500 training cases
+- Computes GTV volume (mm³) per case
+- **Stratified sampling:** selects 50 training + 10 held-out test cases,
+  each balanced across 5 GTV-volume bins
+- Copies to nnUNet raw task format:
+  - `imagesTr/` — 50 training images (`case_0000.nii.gz`)
+  - `labelsTr/` — 50 training GTV masks
+  - `imagesTs/` — 10 held-out test images (for inference)
+  - `labelsTs/` — 10 held-out test GTV masks (for evaluation)
+- Writes `dataset.json` and `subset_manifest.json`
+
+### Stage 2 — Plan & Preprocess
+`nnUNet_plan_and_preprocess`
+
+nnUNet automatically configures:
+- Target voxel spacing (from dataset median)
+- Patch size and batch size (from GPU budget)
+- Intensity normalisation (Z-score for MRI)
+
+**These values are NOT overridden.** nnUNet's auto-configuration is its
+key strength and changing them would defeat its purpose.
+
+### Stage 3 — Stratified 5-Fold Splits
+`create_nnunet_splits.py`
+
+Creates `splits_final.pkl` with 5 folds where each fold's validation set
+contains a balanced distribution of GTV volumes. Seed is fixed (42) for
+reproducibility.
+
+### Stage 4 — Custom Trainer
+`install_nnunet_trainer.py`
+
+Installs `nnUNetTrainerV2_MENRT` — a thin subclass of `nnUNetTrainerV2`
+that reads `max_num_epochs` from the `NNUNET_MAX_EPOCHS` environment variable.
+This allows per-fold epoch control without modifying installed source files.
+
+### Stage 5 — Training
+`nnUNet_train 3d_fullres nnUNetTrainerV2_MENRT Task503_BraTSMENRT <fold>`
+
+nnUNet saves checkpoints automatically:
+- `model_best.model` — whenever validation Dice improves
+- `model_latest.model` — every 50 epochs
+- `model_final_checkpoint.model` — end of training
+
+### Stage 6 — Inference on Held-Out Test Set
+`run_nnunet.py --mode predict-testset`
+
+Runs ensemble inference (all 5 folds) on the 10 held-out test cases:
+1. **Postprocessed** — nnUNet default (removes small disconnected components)
+2. **Raw** — pure network output (`--disable_postprocessing`)
+
+### Stage 7 — Evaluation
+`evaluate_nnunet_testset.py`
+
+Computes per-case and mean metrics for both prediction variants:
+
+| Metric | Description |
+|--------|-------------|
+| **Dice (DSC)** | Voxel overlap — primary GTV segmentation metric |
+| **HD95** | 95th-percentile Hausdorff Distance in mm |
+| **Sensitivity** | Fraction of GT tumour voxels captured |
+| **Precision** | Fraction of predicted voxels that are correct |
+
+Outputs a comparison table showing whether postprocessing improves results.
+
+### Stage 8 — Figures
+`plot_nnunet_results.py`
+
+| Figure | Content |
+|--------|---------|
+| `cv_fold_metrics_bar.png` | Mean Dice per CV fold |
+| `cv_dice_boxplot.png` | Dice distribution across folds |
+| `cv_hd95_boxplot.png` | HD95 distribution across folds |
+| `cv_dice_vs_hd95_scatter.png` | Dice vs HD95 per validation case |
+| `testset_pre_vs_post_bar.png` | Raw vs postprocessed comparison |
+| `testset_dice_boxplot.png` | Test-set Dice distribution |
+| `cv_metrics_table.csv` | Mean ± SD table for thesis |
+
+---
+
+## Why Held-Out Test Set?
+
+Cross-validation metrics can be optimistic because the model selection
+(early stopping on validation Dice) is done on the same cases used for
+CV evaluation. The 10 held-out test cases are completely unseen during
+training, providing an unbiased estimate of generalisation.
+
+```
+500 labeled cases
+    ├── 50 cases → 5-fold CV (training + validation within each fold)
+    └── 10 cases → held-out test (NEVER used during training)
+                   ← unbiased evaluation here
 ```
 
-### 3) Official MedNeXt preprocessing
+---
 
-```bash
-mednextv1_plan_and_preprocess -t 502 -pl3d ExperimentPlanner3D_v21_customTargetSpacing_1x1x1 -pl2d None
-```
+## Why nnUNet Instead of MedNeXt?
 
-This follows the official MedNeXt planner strategy:
+The original plan used MedNeXt-S kernel=3, but:
+- MedNeXt-S kernel=3 requires ~15.5 GB VRAM with nnUNet's auto-configured settings
+- Kaggle T4 GPU provides 14.56 GB (compatible) — 1 GB short
+- Kaggle P100 GPU provides 16 GB but is CUDA sm_60 (incompatible with PyTorch ≥ sm_70)
+- Modifying nnUNet's auto-configured patch/batch size was not permitted
 
-- `1mm` isotropic spacing
-- `128x128x128` planner target conditions used by the official MedNeXt internal pipeline
+Standard nnUNet requires ~8 GB VRAM with the same auto-configuration,
+fitting comfortably on the Kaggle T4.
 
-### 4) Install thin MEN-RT trainer wrapper
+---
 
-```bash
-python scripts/install_mednext_custom_trainer.py \
-  --base-trainer nnUNetTrainerV2_MedNeXt_S_kernel3 \
-  --new-trainer nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT \
-  --epochs-env MEDNEXT_MAX_EPOCHS \
-  --default-epochs 30
-```
+## Configuration Reference
 
-Purpose:
+See `configs/nnunet_baseline.yaml` for all configurable parameters.
+No values are hardcoded in the scripts.
 
-- keep the official MedNeXt trainer family
-- keep the same trainer/output path across sessions
-- allow the Kaggle subset target of `30` epochs and later continuation to any higher target
+---
 
-### 4.5) Validate setup before launching training
+## Citation
 
-```bash
-python scripts/validate_mednext_nnunet_setup.py --config configs/mednext_nnunet.yaml --check-trainer
-```
-
-This checks:
-
-- required CLI commands are available
-- official nnU-Net environment variables are set from config during validation
-- train/val roots exist
-- train cases and val cases can be discovered
-- duplicate case IDs are detected early
-- train/val overlap is reported early
-- the configured official base trainer can be imported
-- the effective subset size is reported
-- approximate per-fold train/validation counts are reported
-- subset-vs-fold compatibility is reported early
-
-### 4.75) Generate stratified 5-fold CV splits
-
-```bash
-python scripts/create_mednext_stratified_splits.py --config configs/mednext_nnunet.yaml
-```
-
-This writes `splits_final.pkl` for nnU-Net(v1) and a JSON summary of the selected strata.
-
-### 5) Train one fold for the Kaggle subset target
-
-```bash
-MEDNEXT_MAX_EPOCHS=30 \
-mednextv1_train 3d_fullres nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT Task502_BraTSMENRT 0 -p nnUNetPlansv2.1_trgSp_1x1x1
-```
-
-### 6) Continue an interrupted run later
-
-```bash
-MEDNEXT_MAX_EPOCHS=150 \
-mednextv1_train 3d_fullres nnUNetTrainerV2_MedNeXt_S_kernel3_MENRT Task502_BraTSMENRT 0 -p nnUNetPlansv2.1_trgSp_1x1x1 -c
-```
-
-Because the trainer name stays the same, continuation remains in the same results directory.
-
-Important:
-
-- if a run is **interrupted** and you want to finish the same target training, `-c` is the correct resume path
-- if you only ran the subset-50 Kaggle workflow and later want thesis-grade final numbers on the full dataset, the cleaner option is to launch a fresh full run for that fold on stronger hardware
-
-## One-command Runner
-
-Wrapper command for this repo:
-
-```bash
-python scripts/run_mednext_nnunet.py --config configs/mednext_nnunet.yaml --mode all --fold 0 --max-epochs 30
-```
-
-Continue later:
-
-```bash
-python scripts/run_mednext_nnunet.py --config configs/mednext_nnunet.yaml --mode train --fold 0 --max-epochs 150 --continue-training
-```
-
-Prediction after a trained fold:
-
-```bash
-python scripts/run_mednext_nnunet.py --config configs/mednext_nnunet.yaml --mode predict --fold 0
-```
-
-If `predict_input` is left empty in config, the runner automatically uses the prepared official task folder:
-
-- `nnUNet_raw_data_base/nnUNet_raw_data/Task502_BraTSMENRT/imagesTs`
-
-## Kaggle Strategy
-
-Recommended workflow:
-
-1. Prepare dataset once.
-2. Preprocess once.
-3. Install trainer wrapper once.
-4. Train **one fold at a time**.
-5. Target `30` epochs per fold on the `50`-case subset.
-6. Leave the nnU-Net auto-generated patch size and batch size untouched.
-7. Inspect coarse segmentation behavior for SAM-Med3D prompting.
-8. Archive fold state.
-9. Resume interrupted runs with `-c`.
-
-Pragmatic recommendation:
-
-- first run the deterministic subset smoke test (`50` train, `20` image-only val/test)
-- use this subset to verify that all `5` folds can launch and complete `30` epochs on Kaggle
-- once the pipeline is verified, set `train_case_limit: 0` and `val_case_limit: 0` for full-dataset experiments
-- for final thesis reporting, run the selected folds again with the full target budget
-
-This is the safest workflow for limited Kaggle time.
-
-## Archive / Restore
-
-Archive one fold:
-
-```bash
-python scripts/archive_mednext_state.py --config configs/mednext_nnunet.yaml --fold 0 --include-preprocessed
-```
-
-Restore later:
-
-```bash
-python scripts/restore_mednext_state.py --archive /path/to/Task502_BraTSMENRT_fold0_state.tar.gz
-```
-
-## Real Result Export After Training
-
-Once official training has actually run, the repo can export real CSV reports from official nnU-Net outputs:
-
-```bash
-python scripts/export_mednext_results.py --config configs/mednext_nnunet.yaml
-```
-
-This writes real reports only after training artifacts exist:
-
-- fold manifest CSV
-- per-case metric CSV from official `validation_raw/summary.json`
-- export JSON summary
-
-The repo does not create fake metric files before training.
-
-## Reproducibility Artifacts
-
-Each runner invocation saves real environment metadata under:
-
-- `menrt_repo_artifacts/command_history.log`
-- `menrt_repo_artifacts/mednext_nnunet_config_snapshot.yaml`
-- `menrt_repo_artifacts/runtime_snapshot.json`
-- `menrt_repo_artifacts/pip_freeze.txt`
-- `menrt_repo_artifacts/git_head.txt`
-- `menrt_repo_artifacts/stratified_splits_summary.json`
-
-## Thesis Framing
-
-Safe wording:
-
-"We used the official MedNeXt implementation within its internal nnU-Net(v1)-based training pipeline to obtain coarse MEN-RT segmentations, which were then used for downstream refinement with SAM-Med3D."
-
-## What to tell your supervisor
-
-Short answer:
-
-- official MedNeXt architecture
-- official MedNeXt internal training pipeline
-- nnU-Net(v1)-based preprocessing and training
-- one fold at a time for stable warm-start and resume-safe execution
-- initial `20` epochs to inspect coarse masks before full completion
+If using the BraTS 2024 MEN-RT dataset, please cite according to `CITATION.bib`.

@@ -1,9 +1,21 @@
+# ── Core scientific stack ────────────────────────────────────────────────────
 numpy>=1.26.4
 pandas>=2.2.2
+scipy>=1.11.4
 matplotlib>=3.9.0
 pyyaml>=6.0.2
-tensorboard>=2.17.0
-simpleitk>=2.3.1
-scipy>=1.11.4
+tqdm>=4.66.4
+
+# ── Medical imaging ──────────────────────────────────────────────────────────
+SimpleITK>=2.3.1
+
+# ── nnUNet v1 (active baseline) ──────────────────────────────────────────────
+# Install via: pip install nnunet==1.7.1
 nnunet==1.7.1
-git+https://github.com/MIC-DKFZ/MedNeXt.git
+
+# ── TensorBoard (training curves) ───────────────────────────────────────────
+tensorboard>=2.17.0
+
+# ── MedNeXt (archived — OOM on Kaggle T4, kernel=3 needs ~15.5 GB VRAM) ────
+# Install via: pip install git+https://github.com/MIC-DKFZ/MedNeXt.git
+# git+https://github.com/MIC-DKFZ/MedNeXt.git

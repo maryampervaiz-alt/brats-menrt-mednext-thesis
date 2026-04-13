@@ -11,25 +11,29 @@ __pycache__/
 venv/
 env/
 
-# Outputs
+# IDE
+.vscode/
+.idea/
+
+# Outputs and logs
 outputs/
 splits/
 *.pt
 *.pth
 *.log
 
-# IDE
-.vscode/
-.idea/
+# nnUNet / MedNeXt working directories (large, Kaggle-generated)
+nnUNet_raw_data_base/
+nnUNet_preprocessed/
+nnUNet_results/
+archives/
+menrt_artifacts/
 
-# Data archives and extracted datasets
+# Dataset archives and NIfTI files (too large for git)
 *.zip
 *.tar.gz
 *.nii
 *.nii.gz
 
-# nnU-Net / MedNeXt workspaces
-nnUNet_raw_data_base/
-nnUNet_preprocessed/
-nnUNet_results/
-archives/
+# Kaggle notebooks checkpoints
+.ipynb_checkpoints/
